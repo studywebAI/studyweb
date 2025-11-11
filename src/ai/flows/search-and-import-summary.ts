@@ -128,10 +128,10 @@ const searchAndImportPrompt = ai.definePrompt({
 
   The user may want to search for content, import content or both.
 
-  If the user provides a \"query\" then use the \"searchItems\" tool to find relevant content.
-  If the user provides \"sourceItemId\" and \"targetTool\" then use the \"importItem\" tool to import the content into the specified tool.
+  If the user provides a "query" then use the "searchItems" tool to find relevant content.
+  If the user provides "sourceItemId" and "targetTool" then use the "importItem" tool to import the content into the specified tool.
 
-  Return the \"matches\" from the searchItems tool and the \"newItemId\" from the importItem tool.  If importItem is used, include the \"newItemMeta\" as well.
+  Return the "matches" from the searchItems tool and the "newItemId" from the importItem tool.  If importItem is used, include the "newItemMeta" as well.
 
   Consider these safety settings:
   BLOCK_NONE for HARM_CATEGORY_DANGEROUS_CONTENT

@@ -51,9 +51,8 @@ const prompt = ai.definePrompt({
 
   Question: {{text}}
   
-  Respond in JSON format that conforms to this schema:
+  Respond in a valid JSON object that conforms to the following Zod schema:
   ${JSON.stringify(GenerateAnswerFromTextOutputSchema.jsonSchema)}
-  Answer:
   `,
 });
 

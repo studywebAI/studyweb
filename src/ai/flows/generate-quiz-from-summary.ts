@@ -60,7 +60,7 @@ Each question should have 4 options and a correct answer index.
 
 Ensure the questions and answers are accurate and relevant to the summary.
 
-Output a JSON object containing an array of question objects that conforms to this schema:
+Output a JSON object containing an array of question objects that conforms to the following Zod schema:
 ${JSON.stringify(GenerateQuizFromSummaryOutputSchema.jsonSchema)}
 `, 
 });

@@ -36,7 +36,7 @@ const prompt = ai.definePrompt({
   input: {schema: GenerateSummaryFromTextInputSchema},
   output: {format: 'json'},
   model: googleAI.model('gemini-1.5-flash'),
-  prompt: `Summarize the following text and respond in JSON format that conforms to this schema:
+  prompt: `Summarize the following text and respond in a valid JSON object that conforms to the following Zod schema:
   ${JSON.stringify(GenerateSummaryFromTextOutputSchema.jsonSchema)}
   
   Text: {{text}}`,

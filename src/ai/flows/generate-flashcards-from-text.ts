@@ -48,7 +48,7 @@ const prompt = ai.definePrompt({
 
   Generate a set of flashcards from the following text. Each flashcard should have a front (term or concept), a back (definition or explanation), and an optional explanation for more context.
   
-  Respond in JSON format that conforms to this schema:
+  Respond in a valid JSON object that conforms to the following Zod schema:
   ${JSON.stringify(GenerateFlashcardsFromTextOutputSchema.jsonSchema)}
 
   Text: {{{text}}}
