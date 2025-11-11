@@ -32,13 +32,17 @@ export type GenerateAnswerFromTextOutput = z.infer<
 export async function generateAnswerFromText(
   input: GenerateAnswerFromTextInput
 ): Promise<GenerateAnswerFromTextOutput> {
-  return generateAnswerFromTextFlow(input);
+  const result = await generateAnswerFromTextFlow(input);
+  // Genkit's output for raw text prompts is a string, so we need to parse it.
+  if (typeof result === 'string') {
+    return JSON.parse(result);
+  }
+  return result;
 }
 
 const prompt = ai.definePrompt({
   name: 'generateAnswerFromTextPrompt',
   input: {schema: GenerateAnswerFromTextInputSchema},
-  output: {format: 'json'},
   model: googleAI.model('gemini-1.5-flash'),
   prompt: `You are a helpful AI assistant. Answer the user's question based on the conversation history.
 
@@ -51,8 +55,10 @@ const prompt = ai.definePrompt({
 
   Question: {{text}}
   
-  Respond in a valid JSON object that conforms to the following Zod schema:
+  IMPORTANT: Respond ONLY with a valid JSON object that conforms to the following Zod schema. Do not include any other text or markdown formatting.
+  \`\`\`json
   ${JSON.stringify(GenerateAnswerFromTextOutputSchema.jsonSchema)}
+  \`\`\`
   `,
 });
 
@@ -64,6 +70,15 @@ const generateAnswerFromTextFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await prompt(input);
+    // The output from a raw text prompt will be a string, so we parse it.
+    if (typeof output === 'string') {
+      try {
+        return JSON.parse(output);
+      } catch (e) {
+        console.error("Failed to parse JSON output:", output);
+        throw new Error("Invalid JSON response from AI");
+      }
+    }
     return output!;
   }
 );
