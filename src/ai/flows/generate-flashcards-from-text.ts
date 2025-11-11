@@ -44,8 +44,11 @@ export async function generateFlashcardsFromText(
   const prompt = `You are an expert at creating effective flashcards for learning.
 
   Generate a set of flashcards from the following text. Each flashcard should have a front (term or concept), a back (definition or explanation), and an optional explanation for more context.
-  
-  Respond with a valid JSON object matching the following schema:
+
+  Text: ${input.text}
+  `;
+
+  const systemPrompt = `You must respond with a valid JSON object matching the following schema:
   ${JSON.stringify(
     GenerateFlashcardsFromTextOutputSchema.parse({
       cards: [
@@ -56,10 +59,7 @@ export async function generateFlashcardsFromText(
         },
       ],
     })
-  )}
-
-  Text: ${input.text}
-  `;
+  )}`;
 
   try {
     const response = await fetch(
@@ -72,7 +72,10 @@ export async function generateFlashcardsFromText(
         },
         body: JSON.stringify({
           model: 'gpt-4o',
-          messages: [{role: 'user', content: prompt}],
+          messages: [
+            {role: 'system', content: systemPrompt},
+            {role: 'user', content: prompt}
+          ],
           response_format: {type: 'json_object'},
         }),
       }

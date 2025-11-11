@@ -36,24 +36,24 @@ export async function importContentForQuizGeneration(
   input: ImportContentForQuizGenerationInput
 ): Promise<ImportContentForQuizGenerationOutput> {
   const prompt = `Generate a quiz from the following content.
-
-  Respond with a valid JSON object matching the following schema:
-  ${JSON.stringify(
-    ImportContentForQuizGenerationOutputSchema.parse({
-      questions: [
-        {
-          question: '',
-          options: [],
-          correctIndex: 0,
-          explanation: '',
-        },
-      ],
-    })
-  )}
   
   The quiz should have ${input.options?.question_count || 10} questions and the difficulty should be ${input.options?.difficulty || 'medium'}.
   
   Content: ${input.content}`;
+
+  const systemPrompt = `You must respond with a valid JSON object matching the following schema:
+${JSON.stringify(
+  ImportContentForQuizGenerationOutputSchema.parse({
+    questions: [
+      {
+        question: '',
+        options: [],
+        correctIndex: 0,
+        explanation: '',
+      },
+    ],
+  })
+)}`;
 
   try {
     const response = await fetch(
@@ -66,7 +66,10 @@ export async function importContentForQuizGeneration(
         },
         body: JSON.stringify({
           model: 'gpt-4o',
-          messages: [{role: 'user', content: prompt}],
+          messages: [
+            {role: 'system', content: systemPrompt},
+            {role: 'user', content: prompt}
+          ],
           response_format: {type: 'json_object'},
         }),
       }

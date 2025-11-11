@@ -36,20 +36,6 @@ export type GenerateQuizFromSummaryOutput = z.infer<typeof GenerateQuizFromSumma
 export async function generateQuizFromSummary(input: GenerateQuizFromSummaryInput): Promise<GenerateQuizFromSummaryOutput> {
   const prompt = `You are a quiz generator. Generate a quiz based on the following summary.
 
-  Respond with a valid JSON object matching the following schema:
-  ${JSON.stringify(
-    GenerateQuizFromSummaryOutputSchema.parse({
-      questions: [
-        {
-          question: '',
-          options: [],
-          correctIndex: 0,
-          explanation: '',
-        },
-      ],
-    })
-  )}
-
   Summary: ${input.summaryContent}
 
   Options: ${JSON.stringify(input.options)}
@@ -58,6 +44,21 @@ export async function generateQuizFromSummary(input: GenerateQuizFromSummaryInpu
 
   Ensure the questions and answers are accurate and relevant to the summary.
 `;
+
+  const systemPrompt = `You must respond with a valid JSON object matching the following schema:
+${JSON.stringify(
+  GenerateQuizFromSummaryOutputSchema.parse({
+    questions: [
+      {
+        question: '',
+        options: [],
+        correctIndex: 0,
+        explanation: '',
+      },
+    ],
+  })
+)}`;
+
   try {
     const response = await fetch(
       'https://api.openai.com/v1/chat/completions',
@@ -69,7 +70,10 @@ export async function generateQuizFromSummary(input: GenerateQuizFromSummaryInpu
         },
         body: JSON.stringify({
           model: 'gpt-4o',
-          messages: [{role: 'user', content: prompt}],
+          messages: [
+            {role: 'system', content: systemPrompt},
+            {role: 'user', content: prompt}
+          ],
           response_format: {type: 'json_object'},
         }),
       }

@@ -37,9 +37,6 @@ export async function generateAnswerFromText(
 ): Promise<GenerateAnswerFromTextOutput> {
   const prompt = `You are a helpful AI assistant. Answer the user's question based on the conversation history.
 
-  Respond with a valid JSON object matching the following schema:
-  ${JSON.stringify(GenerateAnswerFromTextOutputSchema.parse({answer: ''}))}
-
   ${
     input.history
       ? 'History:\n' +
@@ -52,14 +49,18 @@ export async function generateAnswerFromText(
   Question: ${input.text}
   `;
 
+  const systemPrompt = `You must respond with a valid JSON object matching the following schema:
+  ${JSON.stringify(GenerateAnswerFromTextOutputSchema.parse({answer: ''}))}
+  `;
+
   const messages = [
     {
       role: 'system',
-      content: prompt,
+      content: systemPrompt,
     },
     {
       role: 'user',
-      content: input.text,
+      content: prompt,
     },
   ];
 

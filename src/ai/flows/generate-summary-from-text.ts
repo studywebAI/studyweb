@@ -24,10 +24,11 @@ export async function generateSummaryFromText(
 ): Promise<GenerateSummaryFromTextOutput> {
   const prompt = `You are an expert in summarizing text. Generate a concise summary of the following text.
   
-  Respond with a valid JSON object matching the following schema:
-  ${JSON.stringify(GenerateSummaryFromTextOutputSchema.parse({summary: ''}))}
-
   Text: ${input.text}
+  `;
+
+  const systemPrompt = `You must respond with a valid JSON object matching the following schema:
+  ${JSON.stringify(GenerateSummaryFromTextOutputSchema.parse({summary: ''}))}
   `;
 
   try {
@@ -41,7 +42,10 @@ export async function generateSummaryFromText(
         },
         body: JSON.stringify({
           model: 'gpt-4o',
-          messages: [{role: 'user', content: prompt}],
+          messages: [
+            {role: 'system', content: systemPrompt},
+            {role: 'user', content: prompt}
+          ],
           response_format: {type: 'json_object'},
         }),
       }
