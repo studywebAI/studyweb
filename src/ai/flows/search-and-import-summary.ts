@@ -122,7 +122,7 @@ const searchAndImportPrompt = ai.definePrompt({
   output: {
     schema: SearchAndImportSummaryOutputSchema,
   },
-  model: googleAI.model('gemini-1.5-flash'),
+  model: googleAI.model('gemini-1.5-flash-latest'),
   tools: [searchItems, importItem],
   prompt: `You are a helpful assistant that helps users search for and import existing content.
 
