@@ -1,4 +1,3 @@
-'use server';
 /**
  * @fileOverview This file defines a function for generating answers from text using an AI model.
  *
@@ -31,24 +30,15 @@ export async function generateAnswerFromText(
       throw new Error('Missing OPENAI_API_KEY in environment');
     }
 
-    const messages: any[] = [
-      {
-        role: 'system',
-        content: `You are a helpful AI assistant. Answer the user's question based on the provided conversation history. Respond in JSON format. The response should be a JSON object with a single key "answer".`,
-      },
-    ];
-
-    if (input.history) {
-      input.history.forEach(h => {
-        messages.push({ role: h.role, content: h.content });
-      });
-    }
-
-    messages.push({ role: 'user', content: `Question: ${input.text}` });
-
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
-      messages: messages,
+      messages: [
+        {
+          role: 'system',
+          content: `You are a helpful AI assistant. Answer the user's question based on the provided conversation history. Respond in JSON format with a single key "answer".`,
+        },
+        { role: 'user', content: `History: ${JSON.stringify(input.history)}\n\nQuestion: ${input.text}` },
+      ],
       temperature: 0.5,
       response_format: { type: 'json_object' },
     });

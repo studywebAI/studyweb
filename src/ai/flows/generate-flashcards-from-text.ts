@@ -1,5 +1,3 @@
-'use server';
-
 /**
  * @fileOverview Generates flashcards from a given text using an AI model.
  *
@@ -41,7 +39,7 @@ export async function generateFlashcardsFromText(
       messages: [
         {
           role: 'system',
-          content: `You are an expert at creating effective flashcards for learning. Generate a set of flashcards from the following text. Each flashcard should have a front (term or concept), a back (definition or explanation), and an explanation for more context. Respond in JSON format. The response should be a JSON object with a single key "cards", which is an array of flashcard objects.`,
+          content: `You are an expert at creating effective flashcards for learning. Generate a set of flashcards from the following text. Respond in JSON format. The response should be a JSON object with a single key "cards", which is an array of flashcard objects, each with "front", "back", and "explanation" keys.`,
         },
         { role: 'user', content: `Text: ${input.text}` },
       ],

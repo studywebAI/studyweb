@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
 import { InputArea } from '../input-area';
-import { generateAnswerFromText } from '@/ai/flows/generate-answer-from-text';
+import { handleGenerateAnswer } from '@/app/actions';
 import { Bot, User, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
@@ -33,7 +33,7 @@ export function AnswerTool() {
 
     try {
       const history = newMessages.filter(m => !m.isStreaming).map(m => ({role: m.role, content: m.content})) as {role: 'user' | 'ai', content: string}[];
-      const result = await generateAnswerFromText({ text, history });
+      const result = await handleGenerateAnswer({ text, history });
       const fullText = result.answer;
 
       let currentText = '';

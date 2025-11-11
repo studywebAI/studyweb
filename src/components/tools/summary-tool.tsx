@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ToolOptionsBar, type SummaryOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
-import { generateSummaryFromText } from '@/ai/flows/generate-summary-from-text';
+import { handleGenerateSummary } from '@/app/actions';
 import { Bot, User, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
@@ -47,7 +47,7 @@ export function SummaryTool() {
     setMessages((prev) => [...prev, { role: 'ai', content: '', isStreaming: true }]);
 
     try {
-      const result = await generateSummaryFromText({ text });
+      const result = await handleGenerateSummary({ text });
       let fullText = result.summary;
 
       const tldr = "TL;DR: " + fullText.split('.').slice(0, 1).join('.') + ".";

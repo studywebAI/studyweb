@@ -1,4 +1,3 @@
-'use server';
 /**
  * @fileOverview This file defines a function for generating a quiz from a summary using an AI model.
  */
@@ -38,13 +37,11 @@ export async function generateQuizFromSummary(
       messages: [
         {
           role: 'system',
-          content: `You are a quiz generator. Generate a quiz based on the following summary.
+          content: `You are a quiz generator. Generate a quiz based on the following summary. Respond in JSON format. The response should be a JSON object with a single key "questions", which is an array of question objects. Each question object should have "question", "options" (an array of strings), "correctIndex" (a number), and "explanation" keys.
     
             Options:
             - Number of Questions: ${input.options?.questionCount || 10}
             - Difficulty: ${input.options?.difficulty || 'medium'}
-
-            Respond in JSON format. The response should be a JSON object with a single key "questions", which is an array of question objects.
           `,
         },
         { role: 'user', content: `Summary: ${input.summaryContent}` },

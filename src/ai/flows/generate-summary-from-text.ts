@@ -1,4 +1,3 @@
-'use server';
 /**
  * @fileOverview This file defines a function for generating concise summaries from text using an AI model.
  */

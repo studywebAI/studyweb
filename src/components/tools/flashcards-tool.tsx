@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Layers } from 'lucide-react';
 import { ToolOptionsBar, type FlashcardOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
-import { generateFlashcardsFromText } from '@/ai/flows/generate-flashcards-from-text';
+import { handleGenerateFlashcards } from '@/app/actions';
 import { Skeleton } from '../ui/skeleton';
 import { Card, CardContent } from '../ui/card';
 import {
@@ -41,7 +41,7 @@ export function FlashcardsTool() {
     setError(null);
     setSourceText(text);
     try {
-      const result = await generateFlashcardsFromText({ text });
+      const result = await handleGenerateFlashcards({ text });
       setFlashcards(result.cards);
       addRecent({
         title: text.substring(0, 30) + '...',

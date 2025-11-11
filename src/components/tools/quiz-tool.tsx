@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { Lightbulb, CheckCircle2, XCircle, ChevronRight, Loader2 } from 'lucide-react';
 import { ToolOptionsBar, type QuizOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
-import { generateQuizFromSummary } from '@/ai/flows/generate-quiz-from-summary';
+import { handleGenerateQuiz } from '@/app/actions';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
@@ -45,7 +45,7 @@ export function QuizTool() {
     setIsAnswered(false);
 
     try {
-      const result = await generateQuizFromSummary({ summaryContent: text, options: { questionCount: options.questionCount, difficulty: options.difficulty } });
+      const result = await handleGenerateQuiz({ summaryContent: text, options: { questionCount: options.questionCount, difficulty: options.difficulty } });
       setQuestions(result.questions);
       addRecent({
         title: text.substring(0, 30) + '...',
