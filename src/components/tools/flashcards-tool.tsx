@@ -15,6 +15,7 @@ import {
   CarouselPrevious,
 } from '../ui/carousel';
 import { useApp, type RecentItem } from '../app-provider';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 interface Flashcard {
   front: string;
@@ -26,6 +27,7 @@ export function FlashcardsTool() {
   const [options, setOptions] = useState<FlashcardOptions>({ cardCount: 20 });
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [sourceText, setSourceText] = useState('');
   const { addRecent } = useApp();
 
@@ -36,6 +38,7 @@ export function FlashcardsTool() {
   const generateFlashcards = async (text: string) => {
     setIsLoading(true);
     setFlashcards([]);
+    setError(null);
     setSourceText(text);
     try {
       const result = await generateFlashcardsFromText({ text });
@@ -45,8 +48,9 @@ export function FlashcardsTool() {
         type: 'Flashcards',
         content: text,
       });
-    } catch (error) {
-      console.error('Error generating flashcards:', error);
+    } catch (e: any) {
+      console.error('Error generating flashcards:', e);
+      setError(e.message || 'An unknown error occurred.');
     } finally {
       setIsLoading(false);
     }
@@ -56,6 +60,14 @@ export function FlashcardsTool() {
     generateFlashcards(item.content);
   };
 
+  const ErrorDisplay = ({ message }: { message: string }) => (
+    <div className="flex flex-col items-center justify-center h-full p-8">
+      <Alert variant="destructive" className="max-w-lg">
+        <AlertTitle>Generation Failed</AlertTitle>
+        <AlertDescription>{message}</AlertDescription>
+      </Alert>
+    </div>
+  );
 
   const WelcomeScreen = () => (
     <div className="flex flex-col items-center justify-center h-full text-center p-8">
@@ -108,6 +120,19 @@ export function FlashcardsTool() {
     </div>
   );
 
+  const renderContent = () => {
+    if (isLoading) {
+      return <LoadingScreen />;
+    }
+    if (error) {
+      return <ErrorDisplay message={error} />;
+    }
+    if (flashcards.length > 0) {
+      return <FlashcardView cards={flashcards} />;
+    }
+    return <WelcomeScreen />;
+  };
+
   return (
     <div className="flex h-screen flex-col bg-background">
       <ToolOptionsBar
@@ -116,13 +141,7 @@ export function FlashcardsTool() {
         onFlashcardOptionsChange={handleOptionsChange}
       />
       <div className="flex-grow overflow-y-auto">
-        {isLoading ? (
-          <LoadingScreen />
-        ) : flashcards.length > 0 ? (
-          <FlashcardView cards={flashcards} />
-        ) : (
-          <WelcomeScreen />
-        )}
+        {renderContent()}
       </div>
       <InputArea onSubmit={generateFlashcards} onImport={handleImport} isLoading={isLoading} showImport={true} />
     </div>

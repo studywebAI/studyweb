@@ -1,54 +1,24 @@
 'use server';
 /**
- * @fileOverview This file defines a function for generating a quiz from a summary using the OpenAI API.
+ * @fileOverview This file defines a function for generating a quiz from a summary using an AI model.
  */
 
 import {z} from 'genkit';
 import OpenAI from 'openai';
+import { GenerateQuizFromSummaryInputSchema, GenerateQuizFromSummaryOutputSchema } from './schemas';
+
+
+export type GenerateQuizFromSummaryInput = z.infer<
+  typeof GenerateQuizFromSummaryInputSchema
+>;
+export type GenerateQuizFromSummaryOutput = z.infer<
+  typeof GenerateQuizFromSummaryOutputSchema
+>;
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const GenerateQuizFromSummaryInputSchema = z.object({
-  summaryContent: z
-    .string()
-    .describe('The content of the summary to generate a quiz from.'),
-  options: z
-    .object({
-      questionCount: z
-        .number()
-        .describe('The number of questions to generate for the quiz.'),
-      difficulty: z
-        .string()
-        .optional()
-        .describe('The difficulty level of the quiz questions.'),
-    })
-    .optional(),
-});
-export type GenerateQuizFromSummaryInput = z.infer<
-  typeof GenerateQuizFromSummaryInputSchema
->;
-
-const QuizQuestionSchema = z.object({
-  question: z.string().describe('The quiz question.'),
-  options: z.array(z.string()).describe('The possible answers to the question.'),
-  correctIndex: z
-    .number()
-    .describe('The index of the correct answer in the options array.'),
-  explanation: z
-    .string()
-    .describe('The explanation for why the answer is correct.'),
-});
-
-const GenerateQuizFromSummaryOutputSchema = z.object({
-  questions: z
-    .array(QuizQuestionSchema)
-    .describe('The generated quiz questions.'),
-});
-export type GenerateQuizFromSummaryOutput = z.infer<
-  typeof GenerateQuizFromSummaryOutputSchema
->;
 
 /**
  * Generates a quiz from a given summary content.
@@ -68,37 +38,31 @@ export async function generateQuizFromSummary(
       messages: [
         {
           role: 'system',
-          content: `You are a quiz generator. You must respond with a valid JSON object matching the following schema:
-            {
-              "questions": [
-                {
-                  "question": "The question text.",
-                  "options": ["Option A", "Option B", "Option C", "Option D"],
-                  "correctIndex": 0,
-                  "explanation": "Explanation of why the answer is correct."
-                }
-              ]
-            }`,
+          content: `You are a quiz generator. Generate a quiz based on the following summary.
+    
+            Options:
+            - Number of Questions: ${input.options?.questionCount || 10}
+            - Difficulty: ${input.options?.difficulty || 'medium'}
+
+            Respond in JSON format using the following schema: ${JSON.stringify(GenerateQuizFromSummaryOutputSchema)}
+          `,
         },
-        {
-          role: 'user',
-          content: `Generate a quiz based on the following summary.\n\nSummary: ${
-            input.summaryContent
-          }\n\nOptions: ${JSON.stringify(input.options)}`,
-        },
+        { role: 'user', content: `Summary: ${input.summaryContent}` },
       ],
-      response_format: {type: 'json_object'},
+      temperature: 0.4,
+      response_format: { type: 'json_object' },
     });
 
     const content = response.choices[0].message?.content;
     if (!content) {
-      throw new Error('No content returned from OpenAI.');
+      throw new Error('No content returned from OpenAI API.');
     }
 
-    const parsed = JSON.parse(content);
-    return GenerateQuizFromSummaryOutputSchema.parse(parsed);
+    const parsed = GenerateQuizFromSummaryOutputSchema.parse(JSON.parse(content));
+    return parsed;
+
   } catch (error: any) {
     console.error("REAL OPENAI ERROR:", JSON.stringify(error, null, 2));
-    throw error;
+    throw new Error('Failed to generate quiz.');
   }
 }

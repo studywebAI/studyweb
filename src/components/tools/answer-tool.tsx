@@ -32,7 +32,7 @@ export function AnswerTool() {
     setMessages((prev) => [...prev, { role: 'ai', content: '', isStreaming: true }]);
 
     try {
-      const history = newMessages.filter(m => !m.isStreaming);
+      const history = newMessages.filter(m => !m.isStreaming).map(m => ({role: m.role, content: m.content})) as {role: 'user' | 'ai', content: string}[];
       const result = await generateAnswerFromText({ text, history });
       const fullText = result.answer;
 
@@ -50,12 +50,12 @@ export function AnswerTool() {
         );
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating answer:', error);
       setMessages((prev) =>
         prev.map((msg, index) =>
           index === prev.length - 1
-            ? { ...msg, content: 'Sorry, I had trouble generating an answer.' }
+            ? { ...msg, content: `Sorry, I had trouble generating an answer. ${error.message}` }
             : msg
         )
       );

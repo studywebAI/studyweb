@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
 import { useApp } from '../app-provider';
 import Markdown from 'react-markdown';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 
 interface Message {
@@ -25,6 +26,7 @@ export function SummaryTool() {
   });
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { addRecent } = useApp();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -40,8 +42,8 @@ export function SummaryTool() {
 
   const handleSubmit = async (text: string) => {
     setIsLoading(true);
+    setError(null);
     setMessages((prev) => [...prev, { role: 'user', content: text }]);
-
     setMessages((prev) => [...prev, { role: 'ai', content: '', isStreaming: true }]);
 
     try {
@@ -78,17 +80,19 @@ export function SummaryTool() {
         setMessages((prev) =>
           prev.map((msg, index) =>
             index === prev.length - 1
-              ? { ...msg, content: formattedSummary }
+              ? { ...msg, content: formattedSummary, isStreaming: false }
               : msg
           )
         );
       }
-    } catch (error) {
-      console.error('Error generating summary:', error);
+    } catch (e: any) {
+      console.error('Error generating summary:', e);
+       const errorMessage = e.message || 'An unknown error occurred.';
+      setError(errorMessage);
       setMessages((prev) =>
         prev.map((msg, index) =>
           index === prev.length - 1
-            ? { ...msg, content: 'Sorry, I had trouble generating a summary.' }
+            ? { ...msg, content: `Sorry, I had trouble generating a summary. ${errorMessage}`, isStreaming: false }
             : msg
         )
       );
@@ -113,7 +117,7 @@ export function SummaryTool() {
       </p>
     </div>
   );
-
+  
   return (
     <div className="flex h-screen flex-col bg-background">
       <ToolOptionsBar

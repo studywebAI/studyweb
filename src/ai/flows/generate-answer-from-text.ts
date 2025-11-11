@@ -1,6 +1,6 @@
 'use server';
 /**
- * @fileOverview This file defines a function for generating answers from text using the OpenAI API.
+ * @fileOverview This file defines a function for generating answers from text using an AI model.
  *
  * - generateAnswerFromText - A function that takes text and history as input and returns an answer.
  * - GenerateAnswerFromTextInput - The input type for the generateAnswerFromText function.
@@ -9,34 +9,19 @@
 
 import {z} from 'genkit';
 import OpenAI from 'openai';
-import {ChatCompletionMessageParam} from 'openai/resources/chat';
+import {GenerateAnswerFromTextInputSchema, GenerateAnswerFromTextOutputSchema} from './schemas';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-const GenerateAnswerFromTextInputSchema = z.object({
-  text: z.string().describe('The question to answer.'),
-  history: z
-    .array(
-      z.object({
-        role: z.enum(['user', 'ai']),
-        content: z.string(),
-      })
-    )
-    .optional()
-    .describe('The conversation history.'),
-});
 export type GenerateAnswerFromTextInput = z.infer<
   typeof GenerateAnswerFromTextInputSchema
 >;
 
-const GenerateAnswerFromTextOutputSchema = z.object({
-  answer: z.string().describe('The answer to the question.'),
-});
 export type GenerateAnswerFromTextOutput = z.infer<
   typeof GenerateAnswerFromTextOutputSchema
 >;
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 export async function generateAnswerFromText(
   input: GenerateAnswerFromTextInput
@@ -46,44 +31,37 @@ export async function generateAnswerFromText(
       throw new Error('Missing OPENAI_API_KEY in environment');
     }
 
-    const messages: ChatCompletionMessageParam[] = [
+    const messages: any[] = [
       {
         role: 'system',
-        content:
-          'You are a helpful AI assistant. Answer the user\'s question. You must respond with a valid JSON object matching the following schema: { "answer": "The generated answer to the question." }',
+        content: `You are a helpful AI assistant. Answer the user's question based on the provided conversation history. Respond in JSON format using the following schema: ${JSON.stringify(GenerateAnswerFromTextOutputSchema)}`,
       },
     ];
 
     if (input.history) {
       input.history.forEach(h => {
-        // Translate 'ai' role to 'assistant' for OpenAI API
-        messages.push({
-          role: h.role === 'ai' ? 'assistant' : 'user',
-          content: h.content,
-        });
+        messages.push({ role: h.role, content: h.content });
       });
     }
 
-    messages.push({
-      role: 'user',
-      content: input.text,
-    });
+    messages.push({ role: 'user', content: `Question: ${input.text}` });
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o',
-      messages,
-      response_format: {type: 'json_object'},
+      messages: messages,
+      temperature: 0.5,
+      response_format: { type: 'json_object' },
     });
 
     const content = response.choices[0].message?.content;
     if (!content) {
-      throw new Error('No content returned from OpenAI.');
+      throw new Error('No content returned from OpenAI API.');
     }
 
-    const parsed = JSON.parse(content);
-    return GenerateAnswerFromTextOutputSchema.parse(parsed);
+    const parsed = GenerateAnswerFromTextOutputSchema.parse(JSON.parse(content));
+    return parsed;
   } catch (error: any) {
     console.error("REAL OPENAI ERROR:", JSON.stringify(error, null, 2));
-    throw error;
+    throw new Error('Failed to generate answer.');
   }
 }

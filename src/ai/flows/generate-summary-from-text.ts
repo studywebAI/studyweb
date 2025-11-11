@@ -1,28 +1,25 @@
 'use server';
 /**
- * @fileOverview This file defines a function for generating concise summaries from text using the OpenAI API.
+ * @fileOverview This file defines a function for generating concise summaries from text using an AI model.
  */
 
 import {z} from 'genkit';
 import OpenAI from 'openai';
+import {GenerateSummaryFromTextInputSchema, GenerateSummaryFromTextOutputSchema} from './schemas';
+
+
+export type GenerateSummaryFromTextInput = z.infer<
+  typeof GenerateSummaryFromTextInputSchema
+>;
+
+export type GenerateSummaryFromTextOutput = z.infer<
+  typeof GenerateSummaryFromTextOutputSchema
+>;
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const GenerateSummaryFromTextInputSchema = z.object({
-  text: z.string().describe('The text to summarize.'),
-});
-export type GenerateSummaryFromTextInput = z.infer<
-  typeof GenerateSummaryFromTextInputSchema
->;
-
-const GenerateSummaryFromTextOutputSchema = z.object({
-  summary: z.string().describe('The generated summary.'),
-});
-export type GenerateSummaryFromTextOutput = z.infer<
-  typeof GenerateSummaryFromTextOutputSchema
->;
 
 export async function generateSummaryFromText(
   input: GenerateSummaryFromTextInput
@@ -37,25 +34,24 @@ export async function generateSummaryFromText(
       messages: [
         {
           role: 'system',
-          content: `You are an expert in summarizing text. You must respond with a valid JSON object matching the following schema: { "summary": "The generated summary." }`,
+          content: `You are an expert in summarizing text. Generate a concise summary of the provided text. Respond in JSON format using the following schema: ${JSON.stringify(GenerateSummaryFromTextOutputSchema)}`,
         },
-        {
-          role: 'user',
-          content: `Generate a concise summary of the following text.\n\nText: ${input.text}`,
-        },
+        { role: 'user', content: `Text: ${input.text}` },
       ],
-      response_format: {type: 'json_object'},
+      temperature: 0.3,
+      response_format: { type: 'json_object' },
     });
 
     const content = response.choices[0].message?.content;
     if (!content) {
-      throw new Error('No content returned from OpenAI.');
+      throw new Error('No content returned from OpenAI API.');
     }
+    
+    const parsed = GenerateSummaryFromTextOutputSchema.parse(JSON.parse(content));
+    return parsed;
 
-    const parsed = JSON.parse(content);
-    return GenerateSummaryFromTextOutputSchema.parse(parsed);
   } catch (error: any) {
     console.error("REAL OPENAI ERROR:", JSON.stringify(error, null, 2));
-    throw error;
+    throw new Error('Failed to generate summary.');
   }
 }

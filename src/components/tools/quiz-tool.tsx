@@ -12,6 +12,7 @@ import { Label } from '../ui/label';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
 import { useApp, type RecentItem } from '../app-provider';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 
 interface Question {
@@ -25,6 +26,7 @@ export function QuizTool() {
   const [options, setOptions] = useState<QuizOptions>({ questionCount: 10, difficulty: 'medium' });
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
@@ -37,6 +39,7 @@ export function QuizTool() {
   const generateQuiz = async (text: string) => {
     setIsLoading(true);
     setQuestions([]);
+    setError(null);
     setCurrentQuestionIndex(0);
     setSelectedAnswer(null);
     setIsAnswered(false);
@@ -49,8 +52,9 @@ export function QuizTool() {
         type: 'Quiz',
         content: text,
       });
-    } catch (error) {
-      console.error('Error generating quiz:', error);
+    } catch (e: any) {
+      console.error('Error generating quiz:', e);
+      setError(e.message || 'An unknown error occurred.');
     } finally {
       setIsLoading(false);
     }
@@ -72,6 +76,15 @@ export function QuizTool() {
   const handleAnswerSubmit = () => {
     setIsAnswered(true);
   }
+
+  const ErrorDisplay = ({ message }: { message: string }) => (
+    <div className="flex flex-col items-center justify-center h-full p-8">
+      <Alert variant="destructive" className="max-w-lg">
+        <AlertTitle>Generation Failed</AlertTitle>
+        <AlertDescription>{message}</AlertDescription>
+      </Alert>
+    </div>
+  );
 
   const WelcomeScreen = () => (
     <div className="flex flex-col items-center justify-center h-full text-center p-8">
@@ -173,6 +186,19 @@ export function QuizTool() {
     );
   };
 
+  const renderContent = () => {
+     if (isLoading) {
+      return <LoadingScreen />;
+    }
+    if (error) {
+      return <ErrorDisplay message={error} />;
+    }
+    if (questions.length > 0) {
+      return <QuizView />;
+    }
+    return <WelcomeScreen />;
+  }
+
   return (
     <div className="flex h-screen flex-col bg-background">
       <ToolOptionsBar
@@ -181,13 +207,7 @@ export function QuizTool() {
         onQuizOptionsChange={handleOptionsChange}
       />
       <div className="flex-grow overflow-y-auto">
-        {isLoading ? (
-          <LoadingScreen />
-        ) : questions.length > 0 ? (
-          <QuizView />
-        ) : (
-          <WelcomeScreen />
-        )}
+        {renderContent()}
       </div>
       <InputArea onSubmit={generateQuiz} onImport={handleImport} isLoading={isLoading} showImport={true}/>
     </div>
