@@ -4,7 +4,7 @@
  *
  * - generateAnswerFromText - A function that takes text as input and returns a summarized version.
  * - GenerateAnswerFromTextInput - The input type for the generateAnswerFromText function.
- * - GenerateAnswerFromTextOutput - The return type for the generateAnswerFromText function.
+ * - GenerateAnswerFromTextOutput - The return type for the generateAnswerFromtext function.
  */
 
 import {ai} from '@/ai/genkit';
@@ -44,7 +44,7 @@ export async function generateAnswerFromText(
 const prompt = ai.definePrompt({
   name: 'generateAnswerFromTextPrompt',
   input: {schema: GenerateAnswerFromTextInputSchema},
-  model: googleAI.model('gemini-1.5-pro-latest'),
+  model: googleAI.model('gemini-1.5-pro'),
   prompt: `You are a helpful AI assistant. Answer the user's question based on the conversation history.
 
   Respond with a valid JSON object matching the following schema:

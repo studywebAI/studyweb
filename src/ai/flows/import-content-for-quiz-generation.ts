@@ -47,7 +47,7 @@ export async function importContentForQuizGeneration(
 const prompt = ai.definePrompt({
   name: 'importContentForQuizGenerationPrompt',
   input: {schema: ImportContentForQuizGenerationInputSchema},
-  model: googleAI.model('gemini-1.5-pro-latest'),
+  model: googleAI.model('gemini-1.5-pro'),
   prompt: `Generate a quiz from the following content.
 
   Respond with a valid JSON object matching the following schema:
