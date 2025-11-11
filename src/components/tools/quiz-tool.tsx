@@ -1,6 +1,6 @@
 'use client';
 
-import React, auseState } from 'react';
+import React, { useState } from 'react';
 import { Lightbulb, CheckCircle2, XCircle, ChevronRight, Loader2 } from 'lucide-react';
 import { ToolOptionsBar, type QuizOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
