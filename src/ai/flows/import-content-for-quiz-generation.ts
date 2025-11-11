@@ -8,6 +8,7 @@
  */
 
 import {ai} from '@/ai/genkit';
+import {googleAI} from '@genkit-ai/google-genai';
 import {z} from 'genkit';
 
 const ImportContentForQuizGenerationInputSchema = z.object({
@@ -47,6 +48,7 @@ const prompt = ai.definePrompt({
   name: 'importContentForQuizGenerationPrompt',
   input: {schema: ImportContentForQuizGenerationInputSchema},
   output: {schema: ImportContentForQuizGenerationOutputSchema},
+  model: googleAI.model('gemini-1.5-flash-latest'),
   prompt: `Generate a quiz from the following content. The quiz should have {{{options.question_count}}} questions and the difficulty should be {{{options.difficulty}}}.\n\nContent: {{{content}}}`,
 });
 

@@ -8,6 +8,7 @@
  */
 
 import {ai} from '@/ai/genkit';
+import {googleAI} from '@genkit-ai/google-genai';
 import {z} from 'genkit';
 
 const GenerateSummaryFromTextInputSchema = z.object({
@@ -34,6 +35,7 @@ const prompt = ai.definePrompt({
   name: 'generateSummaryFromTextPrompt',
   input: {schema: GenerateSummaryFromTextInputSchema},
   output: {schema: GenerateSummaryFromTextOutputSchema},
+  model: googleAI.model('gemini-1.5-flash-latest'),
   prompt: `Summarize the following text:\n\n{{text}}`,
 });
 
