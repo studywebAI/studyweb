@@ -48,7 +48,7 @@ const prompt = ai.definePrompt({
   name: 'importContentForQuizGenerationPrompt',
   input: {schema: ImportContentForQuizGenerationInputSchema},
   output: {schema: ImportContentForQuizGenerationOutputSchema},
-  model: googleAI.model('gemini-1.5-flash'),
+  model: googleAI.model('gemini-pro'),
   prompt: `Generate a quiz from the following content. The quiz should have {{{options.question_count}}} questions and the difficulty should be {{{options.difficulty}}}.\n\nContent: {{{content}}}`,
 });
 
