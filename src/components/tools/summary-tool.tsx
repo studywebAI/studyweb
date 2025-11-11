@@ -4,7 +4,7 @@ import { ToolOptionsBar } from '../tool-options-bar';
 import { InputArea } from '../input-area';
 import { generateSummaryFromText } from '@/ai/flows/generate-summary-from-text';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Bot, User } from 'lucide-react';
+import { Bot, User, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
 import { Badge } from '../ui/badge';
