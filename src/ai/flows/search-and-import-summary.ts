@@ -122,7 +122,7 @@ const searchAndImportPrompt = ai.definePrompt({
   output: {
     schema: SearchAndImportSummaryOutputSchema,
   },
-  model: googleAI.model('gemini-pro'),
+  model: googleAI.model('gemini-1.5-flash'),
   tools: [searchItems, importItem],
   prompt: `You are a helpful assistant that helps users search for and import existing content.
 
@@ -168,7 +168,7 @@ const searchAndImportSummaryFlow = ai.defineFlow(
     inputSchema: SearchAndImportSummaryInputSchema,
     outputSchema: SearchAndImportSummaryOutputSchema,
   },
-  async input => {.
+  async input => {
     const {output} = await searchAndImportPrompt(input);
     return output!;
   }
