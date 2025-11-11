@@ -37,7 +37,7 @@ export async function importContentForQuizGeneration(
     
             The quiz should have ${input.options?.question_count || 10} questions and the difficulty should be ${input.options?.difficulty || 'medium'}.
             
-            Respond in JSON format using the following schema: ${JSON.stringify(ImportContentForQuizGenerationOutputSchema)}
+            Respond in JSON format. The response should be a JSON object with a single key "questions", which is an array of question objects.
             `,
         },
         { role: 'user', content: `Content: ${input.content}` },

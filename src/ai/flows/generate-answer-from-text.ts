@@ -34,7 +34,7 @@ export async function generateAnswerFromText(
     const messages: any[] = [
       {
         role: 'system',
-        content: `You are a helpful AI assistant. Answer the user's question based on the provided conversation history. Respond in JSON format using the following schema: ${JSON.stringify(GenerateAnswerFromTextOutputSchema)}`,
+        content: `You are a helpful AI assistant. Answer the user's question based on the provided conversation history. Respond in JSON format. The response should be a JSON object with a single key "answer".`,
       },
     ];
 

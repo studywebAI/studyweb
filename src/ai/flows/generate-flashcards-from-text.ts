@@ -41,7 +41,7 @@ export async function generateFlashcardsFromText(
       messages: [
         {
           role: 'system',
-          content: `You are an expert at creating effective flashcards for learning. Generate a set of flashcards from the following text. Each flashcard should have a front (term or concept), a back (definition or explanation), and an explanation for more context. Respond in JSON format using the following schema: ${JSON.stringify(GenerateFlashcardsFromTextOutputSchema)}`,
+          content: `You are an expert at creating effective flashcards for learning. Generate a set of flashcards from the following text. Each flashcard should have a front (term or concept), a back (definition or explanation), and an explanation for more context. Respond in JSON format. The response should be a JSON object with a single key "cards", which is an array of flashcard objects.`,
         },
         { role: 'user', content: `Text: ${input.text}` },
       ],

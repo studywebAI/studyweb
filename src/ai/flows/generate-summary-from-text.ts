@@ -34,7 +34,7 @@ export async function generateSummaryFromText(
       messages: [
         {
           role: 'system',
-          content: `You are an expert in summarizing text. Generate a concise summary of the provided text. Respond in JSON format using the following schema: ${JSON.stringify(GenerateSummaryFromTextOutputSchema)}`,
+          content: `You are an expert in summarizing text. Generate a concise summary of the provided text. Respond in JSON format. The response should be a JSON object with a single key "summary".`,
         },
         { role: 'user', content: `Text: ${input.text}` },
       ],

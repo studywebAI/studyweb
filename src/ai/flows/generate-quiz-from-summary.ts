@@ -44,7 +44,7 @@ export async function generateQuizFromSummary(
             - Number of Questions: ${input.options?.questionCount || 10}
             - Difficulty: ${input.options?.difficulty || 'medium'}
 
-            Respond in JSON format using the following schema: ${JSON.stringify(GenerateQuizFromSummaryOutputSchema)}
+            Respond in JSON format. The response should be a JSON object with a single key "questions", which is an array of question objects.
           `,
         },
         { role: 'user', content: `Summary: ${input.summaryContent}` },
