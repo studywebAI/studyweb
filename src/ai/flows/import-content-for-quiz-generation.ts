@@ -4,6 +4,11 @@
  */
 
 import {z} from 'genkit';
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 const ImportContentForQuizGenerationInputSchema = z.object({
   content: z.string().describe('The content to be used for quiz generation.'),
@@ -35,66 +40,49 @@ export type ImportContentForQuizGenerationOutput = z.infer<
 export async function importContentForQuizGeneration(
   input: ImportContentForQuizGenerationInput
 ): Promise<ImportContentForQuizGenerationOutput> {
-  const userPrompt = `Generate a quiz from the following content.
-  
-  The quiz should have ${input.options?.question_count || 10} questions and the difficulty should be ${input.options?.difficulty || 'medium'}.
-  
-  Content: ${input.content}`;
-
-  const systemPrompt = `You must respond with a valid JSON object matching the following schema:
-{
-  "questions": [
-    {
-      "question": "The question text.",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "correctIndex": 0,
-      "explanation": "Explanation of why the answer is correct."
-    }
-  ]
-}
-`;
-
-  const messages = [
-    {role: 'system', content: systemPrompt},
-    {role: 'user', content: userPrompt}
-  ];
-
   try {
-    const response = await fetch(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('Missing OPENAI_API_KEY in environment');
+    }
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a quiz generator. You must respond with a valid JSON object matching the following schema:
+            {
+              "questions": [
+                {
+                  "question": "The question text.",
+                  "options": ["Option A", "Option B", "Option C", "Option D"],
+                  "correctIndex": 0,
+                  "explanation": "Explanation of why the answer is correct."
+                }
+              ]
+            }`,
         },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: messages,
-          response_format: {type: 'json_object'},
-        }),
-      }
-    );
+        {
+          role: 'user',
+          content: `Generate a quiz from the following content.\n\nThe quiz should have ${
+            input.options?.question_count || 10
+          } questions and the difficulty should be ${
+            input.options?.difficulty || 'medium'
+          }.\n\nContent: ${input.content}`,
+        },
+      ],
+      response_format: {type: 'json_object'},
+    });
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(
-        `OpenAI API request failed with status ${response.status}: ${errorBody}`
-      );
+    const content = response.choices[0].message?.content;
+    if (!content) {
+      throw new Error('No content returned from OpenAI.');
     }
 
-    const data = await response.json();
-    const content = data.choices[0].message.content;
-
-    try {
-      const parsed = JSON.parse(content);
-      return ImportContentForQuizGenerationOutputSchema.parse(parsed);
-    } catch (e) {
-      console.error('Failed to parse OpenAI response as JSON:', content);
-      throw new Error('Failed to parse LLM response as JSON');
-    }
-  } catch (error) {
-    console.error('Error calling OpenAI API:', error);
-    throw new Error('Failed to generate quiz.');
+    const parsed = JSON.parse(content);
+    return ImportContentForQuizGenerationOutputSchema.parse(parsed);
+  } catch (error: any) {
+    console.error("REAL OPENAI ERROR:", JSON.stringify(error, null, 2));
+    throw error;
   }
 }

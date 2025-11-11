@@ -8,6 +8,12 @@
  */
 
 import {z} from 'genkit';
+import OpenAI from 'openai';
+import {ChatCompletionMessageParam} from 'openai/resources/chat';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 const GenerateAnswerFromTextInputSchema = z.object({
   text: z.string().describe('The question to answer.'),
@@ -35,73 +41,49 @@ export type GenerateAnswerFromTextOutput = z.infer<
 export async function generateAnswerFromText(
   input: GenerateAnswerFromTextInput
 ): Promise<GenerateAnswerFromTextOutput> {
-  const userPrompt = `Answer the user's question based on the conversation history.
-
-  ${
-    input.history
-      ? 'History:\n' +
-        input.history
-          .map(h => `${h.role === 'ai' ? 'AI' : 'User'}: ${h.content}`)
-          .join('\n')
-      : ''
-  }
-
-  Question: ${input.text}
-  `;
-
-  const systemPrompt = `You are a helpful AI assistant. You must respond with a valid JSON object matching the following schema:
-  {
-    "answer": "The generated answer to the question."
-  }
-  `;
-
-  const messages = [
-    {
-      role: 'system',
-      content: systemPrompt,
-    },
-    {
-      role: 'user',
-      content: userPrompt,
-    },
-  ];
-
   try {
-    const response = await fetch(
-      'https://api.openai.com/v1/chat/completions',
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('Missing OPENAI_API_KEY in environment');
+    }
+
+    const messages: ChatCompletionMessageParam[] = [
       {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: messages,
-          response_format: {type: 'json_object'},
-        }),
-      }
-    );
+        role: 'system',
+        content:
+          'You are a helpful AI assistant. Answer the user\'s question. You must respond with a valid JSON object matching the following schema: { "answer": "The generated answer to the question." }',
+      },
+    ];
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(
-        `OpenAI API request failed with status ${response.status}: ${errorBody}`
-      );
+    if (input.history) {
+      input.history.forEach(h => {
+        // Translate 'ai' role to 'assistant' for OpenAI API
+        messages.push({
+          role: h.role === 'ai' ? 'assistant' : 'user',
+          content: h.content,
+        });
+      });
     }
 
-    const data = await response.json();
-    const content = data.choices[0].message.content;
+    messages.push({
+      role: 'user',
+      content: input.text,
+    });
 
-    try {
-      const parsed = JSON.parse(content);
-      return GenerateAnswerFromTextOutputSchema.parse(parsed);
-    } catch (e) {
-      console.error('Failed to parse OpenAI response as JSON:', content);
-      throw new Error('Failed to parse LLM response as JSON');
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages,
+      response_format: {type: 'json_object'},
+    });
+
+    const content = response.choices[0].message?.content;
+    if (!content) {
+      throw new Error('No content returned from OpenAI.');
     }
-  } catch (error) {
-    console.error('Error calling OpenAI API:', error);
-    throw new Error('Failed to generate answer.');
+
+    const parsed = JSON.parse(content);
+    return GenerateAnswerFromTextOutputSchema.parse(parsed);
+  } catch (error: any) {
+    console.error("REAL OPENAI ERROR:", JSON.stringify(error, null, 2));
+    throw error;
   }
 }

@@ -9,6 +9,11 @@
  */
 
 import {z} from 'genkit';
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 const GenerateFlashcardsFromTextInputSchema = z.object({
   text: z.string().describe('The text to generate flashcards from.'),
@@ -41,66 +46,45 @@ export type GenerateFlashcardsFromTextOutput = z.infer<
 export async function generateFlashcardsFromText(
   input: GenerateFlashcardsFromTextInput
 ): Promise<GenerateFlashcardsFromTextOutput> {
-  const userPrompt = `You are an expert at creating effective flashcards for learning.
-
-  Generate a set of flashcards from the following text. Each flashcard should have a front (term or concept), a back (definition or explanation), and an optional explanation for more context.
-
-  Text: ${input.text}
-  `;
-
-  const systemPrompt = `You must respond with a valid JSON object matching the following schema:
-  {
-    "cards": [
-      {
-        "front": "Term or concept",
-        "back": "Definition or explanation",
-        "explanation": "Additional context"
-      }
-    ]
-  }
-  `;
-
-  const messages = [
-    {role: 'system', content: systemPrompt},
-    {role: 'user', content: userPrompt}
-  ];
-
   try {
-    const response = await fetch(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('Missing OPENAI_API_KEY in environment');
+    }
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: `You are an expert at creating effective flashcards for learning. You must respond with a valid JSON object matching the following schema:
+            {
+              "cards": [
+                {
+                  "front": "Term or concept",
+                  "back": "Definition or explanation",
+                  "explanation": "Additional context"
+                }
+              ]
+            }
+            `,
         },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: messages,
-          response_format: {type: 'json_object'},
-        }),
-      }
-    );
+        {
+          role: 'user',
+          content: `Generate a set of flashcards from the following text. Each flashcard should have a front (term or concept), a back (definition or explanation), and an optional explanation for more context.\n\nText: ${input.text}`,
+        },
+      ],
+      response_format: {type: 'json_object'},
+    });
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(
-        `OpenAI API request failed with status ${response.status}: ${errorBody}`
-      );
+    const content = response.choices[0].message?.content;
+    if (!content) {
+      throw new Error('No content returned from OpenAI.');
     }
 
-    const data = await response.json();
-    const content = data.choices[0].message.content;
-
-    try {
-      const parsed = JSON.parse(content);
-      return GenerateFlashcardsFromTextOutputSchema.parse(parsed);
-    } catch (e) {
-      console.error('Failed to parse OpenAI response as JSON:', content);
-      throw new Error('Failed to parse LLM response as JSON');
-    }
-  } catch (error) {
-    console.error('Error calling OpenAI API:', error);
-    throw new Error('Failed to generate flashcards.');
+    const parsed = JSON.parse(content);
+    return GenerateFlashcardsFromTextOutputSchema.parse(parsed);
+  } catch (error: any) {
+    console.error("REAL OPENAI ERROR:", JSON.stringify(error, null, 2));
+    throw error;
   }
 }
