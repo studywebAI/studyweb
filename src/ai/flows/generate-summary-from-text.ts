@@ -35,6 +35,7 @@ export async function generateSummaryFromText(
 const prompt = ai.definePrompt({
   name: 'generateSummaryFromTextPrompt',
   input: {schema: GenerateSummaryFromTextInputSchema},
+  model: googleAI.model('models/gemini-1.5-flash-latest'),
   prompt: `You are an expert in summarizing text. Generate a concise summary of the following text.
   
   Respond with a valid JSON object matching the following schema:
