@@ -35,7 +35,7 @@ const prompt = ai.definePrompt({
   name: 'generateSummaryFromTextPrompt',
   input: {schema: GenerateSummaryFromTextInputSchema},
   output: {schema: GenerateSummaryFromTextOutputSchema},
-  model: googleAI.model('gemini-1.0-pro'),
+  model: googleAI.model('gemini-1.5-flash'),
   prompt: `Summarize the following text:\n\n{{text}}`,
 });
 
