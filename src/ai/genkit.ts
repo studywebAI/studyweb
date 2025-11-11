@@ -1,12 +1,13 @@
 import {genkit} from 'genkit';
 import {googleAI} from '@genkit-ai/google-genai';
 
-// IMPORTANT: Replace "YOUR_API_KEY_HERE" with your actual Gemini API key.
-const apiKey = 'YOUR_API_KEY_HERE';
+// The API key is read from the GEMINI_API_KEY environment variable.
+// This is a secure way to handle secrets and is configured in your project's settings.
+const apiKey = process.env.GEMINI_API_KEY;
 
-if (apiKey === 'YOUR_API_KEY_HERE') {
+if (!apiKey) {
   console.warn(
-    'Gemini API key is not configured. Please replace "YOUR_API_KEY_HERE" in src/ai/genkit.ts with your actual API key.'
+    'Gemini API key is not configured. Please set the GEMINI_API_KEY environment variable in your project settings.'
   );
 }
 
