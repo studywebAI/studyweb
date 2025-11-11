@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Layers } from 'lucide-react';
-import { ToolOptionsBar } from '../tool-options-bar';
+import { ToolOptionsBar, type FlashcardOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
 import { generateFlashcardsFromText } from '@/ai/flows/generate-flashcards-from-text';
 import { Skeleton } from '../ui/skeleton';
@@ -14,6 +14,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from '../ui/carousel';
+import { useApp, type RecentItem } from '../app-provider';
 
 interface Flashcard {
   front: string;
@@ -22,22 +23,39 @@ interface Flashcard {
 }
 
 export function FlashcardsTool() {
+  const [options, setOptions] = useState<FlashcardOptions>({ cardCount: 20 });
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [sourceText, setSourceText] = useState('');
+  const { addRecent } = useApp();
 
-  const handleSubmit = async (text: string) => {
+  const handleOptionsChange = (newOptions: Partial<FlashcardOptions>) => {
+    setOptions((prev) => ({ ...prev, ...newOptions }));
+  };
+
+  const generateFlashcards = async (text: string) => {
     setIsLoading(true);
     setFlashcards([]);
+    setSourceText(text);
     try {
       const result = await generateFlashcardsFromText({ text });
       setFlashcards(result.cards);
+      addRecent({
+        title: text.substring(0, 30) + '...',
+        type: 'Flashcards',
+        content: text,
+      });
     } catch (error) {
       console.error('Error generating flashcards:', error);
-      // You could show a toast notification here
     } finally {
       setIsLoading(false);
     }
   };
+  
+  const handleImport = (item: RecentItem) => {
+    generateFlashcards(item.content);
+  };
+
 
   const WelcomeScreen = () => (
     <div className="flex flex-col items-center justify-center h-full text-center p-8">
@@ -55,14 +73,10 @@ export function FlashcardsTool() {
   );
 
   const LoadingScreen = () => (
-    <div className="mx-auto max-w-3xl p-4 md:p-6">
-      <div className="space-y-4">
-        <Skeleton className="h-48 w-full" />
-        <div className="flex justify-center gap-4">
-          <Skeleton className="h-10 w-24" />
-          <Skeleton className="h-10 w-24" />
-        </div>
-      </div>
+    <div className="flex-grow flex flex-col items-center justify-center p-4 md:p-6">
+       <div className="w-full max-w-md p-1">
+          <Skeleton className="aspect-video w-full rounded-lg" />
+       </div>
     </div>
   );
 
@@ -98,13 +112,8 @@ export function FlashcardsTool() {
     <div className="flex h-screen flex-col bg-background">
       <ToolOptionsBar
         activeTool="flashcards"
-        summaryOptions={{
-          detailLevel: 3,
-          format: 'paragraphs',
-          tone: 'concise',
-          animation: true,
-        }}
-        onSummaryOptionsChange={() => {}}
+        flashcardOptions={options}
+        onFlashcardOptionsChange={handleOptionsChange}
       />
       <div className="flex-grow overflow-y-auto">
         {isLoading ? (
@@ -115,7 +124,7 @@ export function FlashcardsTool() {
           <WelcomeScreen />
         )}
       </div>
-      <InputArea onSubmit={handleSubmit} isLoading={isLoading} />
+      <InputArea onSubmit={generateFlashcards} onImport={handleImport} isLoading={isLoading} showImport={true} />
     </div>
   );
 }

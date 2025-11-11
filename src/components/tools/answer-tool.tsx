@@ -1,14 +1,10 @@
 'use client';
 import React, { useState, useEffect, useRef } from 'react';
-import { ToolOptionsBar, type SummaryOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
-import { generateSummaryFromText } from '@/ai/flows/generate-summary-from-text';
-import { Bot, User, FileText } from 'lucide-react';
+import { generateAnswerFromText } from '@/ai/flows/generate-answer-from-text';
+import { Bot, User, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
-import { useApp } from '../app-provider';
-import Markdown from 'react-markdown';
-
 
 interface Message {
   role: 'user' | 'ai';
@@ -16,16 +12,9 @@ interface Message {
   isStreaming?: boolean;
 }
 
-export function SummaryTool() {
-  const [options, setOptions] = useState<SummaryOptions>({
-    detailLevel: 3,
-    format: 'paragraphs',
-    tone: 'concise',
-    animation: true,
-  });
+export function AnswerTool() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const { addRecent } = useApp();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -34,61 +23,39 @@ export function SummaryTool() {
 
   useEffect(scrollToBottom, [messages]);
 
-  const handleOptionsChange = (newOptions: Partial<SummaryOptions>) => {
-    setOptions((prev) => ({ ...prev, ...newOptions }));
-  };
-
   const handleSubmit = async (text: string) => {
     setIsLoading(true);
-    setMessages((prev) => [...prev, { role: 'user', content: text }]);
+    const newMessages: Message[] = [...messages, { role: 'user', content: text }];
+    setMessages(newMessages);
 
+    // Add a placeholder for AI response
     setMessages((prev) => [...prev, { role: 'ai', content: '', isStreaming: true }]);
 
     try {
-      const result = await generateSummaryFromText({ text });
-      let fullText = result.summary;
+      const history = newMessages.filter(m => !m.isStreaming);
+      const result = await generateAnswerFromText({ text, history });
+      const fullText = result.answer;
 
-      const tldr = "TL;DR: " + fullText.split('.').slice(0, 1).join('.') + ".";
-      const keyPoints = fullText.split('. ').slice(1, 4).map(s => s.trim()).filter(s => s);
-      const detailedSummary = fullText;
-
-      const formattedSummary = `### ${tldr}\n\n**Key Points:**\n${keyPoints.map(p => `- ${p}`).join('\n')}\n\n---\n\n### Detailed Summary\n${detailedSummary}`;
-
-      addRecent({
-        title: text.substring(0, 30) + '...',
-        type: 'Summary',
-        content: fullText,
-      });
-
-      if (options.animation) {
-        let currentText = '';
-        const words = formattedSummary.split(' ');
-        for (let i = 0; i < words.length; i++) {
-          await new Promise((resolve) => setTimeout(resolve, 20));
-          currentText += words[i] + ' ';
-          setMessages((prev) =>
-            prev.map((msg, index) =>
-              index === prev.length - 1
-                ? { ...msg, content: currentText }
-                : msg
-            )
-          );
-        }
-      } else {
+      let currentText = '';
+      const words = fullText.split(' ');
+      for (let i = 0; i < words.length; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        currentText += words[i] + ' ';
         setMessages((prev) =>
           prev.map((msg, index) =>
             index === prev.length - 1
-              ? { ...msg, content: formattedSummary }
+              ? { ...msg, content: currentText }
               : msg
           )
         );
       }
+
     } catch (error) {
-      console.error('Error generating summary:', error);
+      console.error('Error generating answer:', error);
       setMessages((prev) =>
         prev.map((msg, index) =>
           index === prev.length - 1
-            ? { ...msg, content: 'Sorry, I had trouble generating a summary.' }
+            ? { ...msg, content: 'Sorry, I had trouble generating an answer.' }
             : msg
         )
       );
@@ -105,22 +72,17 @@ export function SummaryTool() {
   const WelcomeScreen = () => (
     <div className="flex flex-col items-center justify-center h-full text-center p-8">
       <div className="bg-primary/10 p-4 rounded-full mb-4">
-        <FileText className="w-10 h-10 text-primary" />
+        <HelpCircle className="w-10 h-10 text-primary" />
       </div>
-      <h1 className="font-headline text-3xl font-bold mb-2">Summary Tool</h1>
+      <h1 className="font-headline text-3xl font-bold mb-2">Answer Tool</h1>
       <p className="text-muted-foreground max-w-md">
-        Paste any text, and I'll generate a concise summary, highlight key points, and provide a TL;DR.
+        Ask me anything! I'll do my best to provide a clear and concise answer.
       </p>
     </div>
   );
 
   return (
     <div className="flex h-screen flex-col bg-background">
-      <ToolOptionsBar
-        activeTool="summary"
-        summaryOptions={options}
-        onSummaryOptionsChange={handleOptionsChange}
-      />
       <div className="flex-grow overflow-y-auto p-4 md:p-6">
         <div className="mx-auto max-w-3xl space-y-6">
           {messages.length === 0 && !isLoading && <WelcomeScreen />}
@@ -152,13 +114,7 @@ export function SummaryTool() {
                     <Skeleton className="h-4 w-56" />
                   </div>
                 ) : (
-                  msg.role === 'ai' ? (
-                    <article className="prose prose-sm max-w-none dark:prose-invert">
-                      <Markdown>{msg.content}</Markdown>
-                    </article>
-                  ) : (
-                    <p>{msg.content}</p>
-                  )
+                  <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: msg.content.replace(/\n/g, '<br />') }} />
                 )}
               </div>
               {msg.role === 'user' && (
@@ -168,10 +124,10 @@ export function SummaryTool() {
               )}
             </div>
           ))}
-           <div ref={messagesEndRef} />
+          <div ref={messagesEndRef} />
         </div>
       </div>
-      <InputArea onSubmit={handleSubmit} isLoading={isLoading} showImport={false}/>
+      <InputArea onSubmit={handleSubmit} isLoading={isLoading} showImport={false} />
     </div>
   );
 }

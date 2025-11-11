@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, auseState } from 'react';
 import { Lightbulb, CheckCircle2, XCircle, ChevronRight, Loader2 } from 'lucide-react';
-import { ToolOptionsBar } from '../tool-options-bar';
+import { ToolOptionsBar, type QuizOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
 import { generateQuizFromSummary } from '@/ai/flows/generate-quiz-from-summary';
 import { Button } from '../ui/button';
@@ -11,6 +11,8 @@ import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Label } from '../ui/label';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
+import { useApp, type RecentItem } from '../app-provider';
+
 
 interface Question {
   question: string;
@@ -20,13 +22,19 @@ interface Question {
 }
 
 export function QuizTool() {
+  const [options, setOptions] = useState<QuizOptions>({ questionCount: 10, difficulty: 'medium' });
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
+  const { addRecent } = useApp();
 
-  const handleSubmit = async (text: string) => {
+  const handleOptionsChange = (newOptions: Partial<QuizOptions>) => {
+    setOptions(prev => ({ ...prev, ...newOptions }));
+  };
+
+  const generateQuiz = async (text: string) => {
     setIsLoading(true);
     setQuestions([]);
     setCurrentQuestionIndex(0);
@@ -34,14 +42,24 @@ export function QuizTool() {
     setIsAnswered(false);
 
     try {
-      const result = await generateQuizFromSummary({ summaryContent: text });
+      const result = await generateQuizFromSummary({ summaryContent: text, options: { questionCount: options.questionCount, difficulty: options.difficulty } });
       setQuestions(result.questions);
+      addRecent({
+        title: text.substring(0, 30) + '...',
+        type: 'Quiz',
+        content: text,
+      });
     } catch (error) {
       console.error('Error generating quiz:', error);
     } finally {
       setIsLoading(false);
     }
   };
+
+  const handleImport = (item: RecentItem) => {
+    generateQuiz(item.content);
+  };
+
 
   const handleNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
@@ -159,13 +177,8 @@ export function QuizTool() {
     <div className="flex h-screen flex-col bg-background">
       <ToolOptionsBar
         activeTool="quiz"
-        summaryOptions={{
-          detailLevel: 3,
-          format: 'paragraphs',
-          tone: 'concise',
-          animation: true,
-        }}
-        onSummaryOptionsChange={() => {}}
+        quizOptions={options}
+        onQuizOptionsChange={handleOptionsChange}
       />
       <div className="flex-grow overflow-y-auto">
         {isLoading ? (
@@ -176,7 +189,7 @@ export function QuizTool() {
           <WelcomeScreen />
         )}
       </div>
-      <InputArea onSubmit={handleSubmit} isLoading={isLoading} />
+      <InputArea onSubmit={generateQuiz} onImport={handleImport} isLoading={isLoading} showImport={true}/>
     </div>
   );
 }

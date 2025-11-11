@@ -22,8 +22,9 @@ import {
   Bot,
   Clock,
 } from 'lucide-react';
-import type { Tool } from './app-container';
-import { recents } from '@/lib/mock-data';
+import type { Tool } from './app-provider';
+import { useApp } from './app-provider';
+
 
 interface AppSidebarProps {
   activeTool: Tool;
@@ -38,6 +39,8 @@ const toolConfig = {
 };
 
 export function AppSidebar({ activeTool, setActiveTool }: AppSidebarProps) {
+  const { recents } = useApp();
+  
   return (
     <Sidebar>
       <SidebarHeader>
