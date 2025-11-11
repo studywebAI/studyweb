@@ -29,25 +29,17 @@ export async function generateSummaryFromText(
   input: GenerateSummaryFromTextInput
 ): Promise<GenerateSummaryFromTextOutput> {
   const result = await generateSummaryFromTextFlow(input);
-  // Genkit's output for raw text prompts is a string, so we need to parse it.
-  if (typeof result === 'string') {
-    return JSON.parse(result);
-  }
   return result;
 }
 
 const prompt = ai.definePrompt({
   name: 'generateSummaryFromTextPrompt',
   input: {schema: GenerateSummaryFromTextInputSchema},
+  output: {schema: GenerateSummaryFromTextOutputSchema},
   model: googleAI.model('gemini-1.5-flash'),
   prompt: `You are an expert in summarizing text. Generate a concise summary of the following text.
   
   Text: {{{text}}}
-  
-  IMPORTANT: Respond ONLY with a valid JSON object that conforms to the following Zod schema. Do not include any other text or markdown formatting.
-  \`\`\`json
-  ${JSON.stringify(GenerateSummaryFromTextOutputSchema.jsonSchema)}
-  \`\`\`
   `,
 });
 
@@ -59,15 +51,6 @@ const generateSummaryFromTextFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await prompt(input);
-    // The output from a raw text prompt will be a string, so we parse it.
-    if (typeof output === 'string') {
-      try {
-        return JSON.parse(output);
-      } catch (e) {
-        console.error("Failed to parse JSON output:", output);
-        throw new Error("Invalid JSON response from AI");
-      }
-    }
     return output!;
   }
 );

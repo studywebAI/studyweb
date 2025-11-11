@@ -37,25 +37,18 @@ export async function generateFlashcardsFromText(
   input: GenerateFlashcardsFromTextInput
 ): Promise<GenerateFlashcardsFromTextOutput> {
   const result = await generateFlashcardsFromTextFlow(input);
-  if (typeof result === 'string') {
-    return JSON.parse(result);
-  }
   return result;
 }
 
 const prompt = ai.definePrompt({
   name: 'generateFlashcardsFromTextPrompt',
   input: {schema: GenerateFlashcardsFromTextInputSchema},
+  output: {schema: GenerateFlashcardsFromTextOutputSchema},
   model: googleAI.model('gemini-1.5-flash'),
   prompt: `You are an expert at creating effective flashcards for learning.
 
   Generate a set of flashcards from the following text. Each flashcard should have a front (term or concept), a back (definition or explanation), and an optional explanation for more context.
   
-  IMPORTANT: Respond ONLY with a valid JSON object that conforms to the following Zod schema. Do not include any other text or markdown formatting.
-  \`\`\`json
-  ${JSON.stringify(GenerateFlashcardsFromTextOutputSchema.jsonSchema)}
-  \`\`\`
-
   Text: {{{text}}}
   `,
 });
@@ -68,14 +61,6 @@ const generateFlashcardsFromTextFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await prompt(input);
-    if (typeof output === 'string') {
-      try {
-        return JSON.parse(output);
-      } catch (e) {
-        console.error("Failed to parse JSON output:", output);
-        throw new Error("Invalid JSON response from AI");
-      }
-    }
     return output!;
   }
 );

@@ -43,15 +43,13 @@ export type GenerateQuizFromSummaryOutput = z.infer<typeof GenerateQuizFromSumma
  */
 export async function generateQuizFromSummary(input: GenerateQuizFromSummaryInput): Promise<GenerateQuizFromSummaryOutput> {
   const result = await generateQuizFromSummaryFlow(input);
-  if (typeof result === 'string') {
-    return JSON.parse(result);
-  }
   return result;
 }
 
 const generateQuizPrompt = ai.definePrompt({
   name: 'generateQuizFromSummaryPrompt',
   input: {schema: GenerateQuizFromSummaryInputSchema},
+  output: {schema: GenerateQuizFromSummaryOutputSchema},
   model: googleAI.model('gemini-1.5-flash'),
   prompt: `You are a quiz generator. Generate a quiz based on the following summary.
 
@@ -62,11 +60,6 @@ Options: {{{options}}}
 Each question should have 4 options and a correct answer index.
 
 Ensure the questions and answers are accurate and relevant to the summary.
-
-IMPORTANT: Respond ONLY with a valid JSON object that conforms to the following Zod schema. Do not include any other text or markdown formatting.
-\`\`\`json
-${JSON.stringify(GenerateQuizFromSummaryOutputSchema.jsonSchema)}
-\`\`\`
 `, 
 });
 
@@ -78,14 +71,6 @@ const generateQuizFromSummaryFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await generateQuizPrompt(input);
-    if (typeof output === 'string') {
-      try {
-        return JSON.parse(output);
-      } catch (e) {
-        console.error("Failed to parse JSON output:", output);
-        throw new Error("Invalid JSON response from AI");
-      }
-    }
     return output!;
   }
 );
