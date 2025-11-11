@@ -49,17 +49,16 @@ export async function generateFlashcardsFromText(
   `;
 
   const systemPrompt = `You must respond with a valid JSON object matching the following schema:
-  ${JSON.stringify(
-    GenerateFlashcardsFromTextOutputSchema.parse({
-      cards: [
-        {
-          front: '',
-          back: '',
-          explanation: '',
-        },
-      ],
-    })
-  )}`;
+  {
+    "cards": [
+      {
+        "front": "Term or concept",
+        "back": "Definition or explanation",
+        "explanation": "Additional context"
+      }
+    ]
+  }
+  `;
 
   try {
     const response = await fetch(

@@ -42,18 +42,17 @@ export async function importContentForQuizGeneration(
   Content: ${input.content}`;
 
   const systemPrompt = `You must respond with a valid JSON object matching the following schema:
-${JSON.stringify(
-  ImportContentForQuizGenerationOutputSchema.parse({
-    questions: [
-      {
-        question: '',
-        options: [],
-        correctIndex: 0,
-        explanation: '',
-      },
-    ],
-  })
-)}`;
+{
+  "questions": [
+    {
+      "question": "The question text.",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctIndex": 0,
+      "explanation": "Explanation of why the answer is correct."
+    }
+  ]
+}
+`;
 
   try {
     const response = await fetch(

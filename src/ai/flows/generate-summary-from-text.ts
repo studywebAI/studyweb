@@ -28,7 +28,9 @@ export async function generateSummaryFromText(
   `;
 
   const systemPrompt = `You must respond with a valid JSON object matching the following schema:
-  ${JSON.stringify(GenerateSummaryFromTextOutputSchema.parse({summary: ''}))}
+  {
+    "summary": "The generated summary."
+  }
   `;
 
   try {

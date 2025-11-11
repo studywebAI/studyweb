@@ -50,7 +50,9 @@ export async function generateAnswerFromText(
   `;
 
   const systemPrompt = `You must respond with a valid JSON object matching the following schema:
-  ${JSON.stringify(GenerateAnswerFromTextOutputSchema.parse({answer: ''}))}
+  {
+    "answer": "The generated answer to the question."
+  }
   `;
 
   const messages = [
