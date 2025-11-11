@@ -11,6 +11,8 @@ import {
   SidebarGroup,
   SidebarGroupLabel,
   SidebarSeparator,
+  useSidebar,
+  SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Button } from './ui/button';
 import {
@@ -24,6 +26,7 @@ import {
 } from 'lucide-react';
 import type { Tool } from './app-provider';
 import { useApp } from './app-provider';
+import { cn } from '@/lib/utils';
 
 
 interface AppSidebarProps {
@@ -40,15 +43,16 @@ const toolConfig = {
 
 export function AppSidebar({ activeTool, setActiveTool }: AppSidebarProps) {
   const { recents } = useApp();
+  const { state } = useSidebar();
   
   return (
     <Sidebar>
       <SidebarHeader>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <Bot className="h-5 w-5 text-primary" />
+        <div className={cn("flex items-center gap-2", state === 'collapsed' && 'justify-center')}>
+          <Button variant="ghost" size="icon" className="h-10 w-10">
+            <Bot className="h-6 w-6 text-primary" />
           </Button>
-          <div className="flex flex-col">
+          <div className={cn("flex flex-col", state === 'collapsed' && 'hidden')}>
             <span className="font-headline text-lg font-semibold tracking-tighter">
               StudyGeniusAI
             </span>
@@ -106,6 +110,9 @@ export function AppSidebar({ activeTool, setActiveTool }: AppSidebarProps) {
               <Settings />
               <span>Settings</span>
             </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+             <SidebarTrigger />
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>

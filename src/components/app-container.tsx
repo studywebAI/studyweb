@@ -3,7 +3,6 @@
 import React from 'react';
 import {
   SidebarProvider,
-  Sidebar,
   SidebarInset,
   SidebarRail,
 } from '@/components/ui/sidebar';
@@ -20,16 +19,16 @@ export function AppContainer() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen">
-        <AppSidebar activeTool={activeTool} setActiveTool={setActiveTool} />
-        <SidebarInset className="min-h-screen">
+      <AppSidebar activeTool={activeTool} setActiveTool={setActiveTool} />
+      <div className="flex flex-col w-full">
+        <SidebarInset>
           {activeTool === 'summary' && <SummaryTool />}
           {activeTool === 'quiz' && <QuizTool />}
           {activeTool === 'flashcards' && <FlashcardsTool />}
           {activeTool === 'answer' && <AnswerTool />}
         </SidebarInset>
-        <SidebarRail />
       </div>
+      <SidebarRail />
     </SidebarProvider>
   );
 }
