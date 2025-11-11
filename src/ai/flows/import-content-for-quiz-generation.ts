@@ -47,9 +47,15 @@ export async function importContentForQuizGeneration(
 const prompt = ai.definePrompt({
   name: 'importContentForQuizGenerationPrompt',
   input: {schema: ImportContentForQuizGenerationInputSchema},
-  output: {schema: ImportContentForQuizGenerationOutputSchema},
   model: googleAI.model('gemini-1.5-flash'),
-  prompt: `Generate a quiz from the following content. The quiz should have {{{options.question_count}}} questions and the difficulty should be {{{options.difficulty}}}.\n\nContent: {{{content}}}`,
+  prompt: `Generate a quiz from the following content.
+
+  Respond with a valid JSON object matching the following schema:
+  ${JSON.stringify(ImportContentForQuizGenerationOutputSchema.parse({questions:[]}))}
+  
+  The quiz should have {{{options.question_count}}} questions and the difficulty should be {{{options.difficulty}}}.
+  
+  Content: {{{content}}}`,
 });
 
 const importContentForQuizGenerationFlow = ai.defineFlow(
@@ -59,7 +65,17 @@ const importContentForQuizGenerationFlow = ai.defineFlow(
     outputSchema: ImportContentForQuizGenerationOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
-    return output!;
+    const response = await prompt(input);
+    const text = response.text;
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      // The model may not have returned valid JSON, so we'll try to extract it.
+      const jsonText = text.match(/```json\n([\s\S]*)\n```/);
+      if (jsonText && jsonText[1]) {
+        return JSON.parse(jsonText[1]);
+      }
+      throw new Error('Failed to parse LLM response as JSON');
+    }
   }
 );
