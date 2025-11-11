@@ -35,7 +35,7 @@ export type ImportContentForQuizGenerationOutput = z.infer<
 export async function importContentForQuizGeneration(
   input: ImportContentForQuizGenerationInput
 ): Promise<ImportContentForQuizGenerationOutput> {
-  const prompt = `Generate a quiz from the following content.
+  const userPrompt = `Generate a quiz from the following content.
   
   The quiz should have ${input.options?.question_count || 10} questions and the difficulty should be ${input.options?.difficulty || 'medium'}.
   
@@ -54,6 +54,11 @@ export async function importContentForQuizGeneration(
 }
 `;
 
+  const messages = [
+    {role: 'system', content: systemPrompt},
+    {role: 'user', content: userPrompt}
+  ];
+
   try {
     const response = await fetch(
       'https://api.openai.com/v1/chat/completions',
@@ -65,10 +70,7 @@ export async function importContentForQuizGeneration(
         },
         body: JSON.stringify({
           model: 'gpt-4o',
-          messages: [
-            {role: 'system', content: systemPrompt},
-            {role: 'user', content: prompt}
-          ],
+          messages: messages,
           response_format: {type: 'json_object'},
         }),
       }

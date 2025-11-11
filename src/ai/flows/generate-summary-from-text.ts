@@ -22,7 +22,7 @@ export type GenerateSummaryFromTextOutput = z.infer<
 export async function generateSummaryFromText(
   input: GenerateSummaryFromTextInput
 ): Promise<GenerateSummaryFromTextOutput> {
-  const prompt = `You are an expert in summarizing text. Generate a concise summary of the following text.
+  const userPrompt = `You are an expert in summarizing text. Generate a concise summary of the following text.
   
   Text: ${input.text}
   `;
@@ -32,6 +32,11 @@ export async function generateSummaryFromText(
     "summary": "The generated summary."
   }
   `;
+  
+  const messages = [
+    {role: 'system', content: systemPrompt},
+    {role: 'user', content: userPrompt}
+  ];
 
   try {
     const response = await fetch(
@@ -44,10 +49,7 @@ export async function generateSummaryFromText(
         },
         body: JSON.stringify({
           model: 'gpt-4o',
-          messages: [
-            {role: 'system', content: systemPrompt},
-            {role: 'user', content: prompt}
-          ],
+          messages: messages,
           response_format: {type: 'json_object'},
         }),
       }

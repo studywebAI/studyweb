@@ -41,7 +41,7 @@ export type GenerateFlashcardsFromTextOutput = z.infer<
 export async function generateFlashcardsFromText(
   input: GenerateFlashcardsFromTextInput
 ): Promise<GenerateFlashcardsFromTextOutput> {
-  const prompt = `You are an expert at creating effective flashcards for learning.
+  const userPrompt = `You are an expert at creating effective flashcards for learning.
 
   Generate a set of flashcards from the following text. Each flashcard should have a front (term or concept), a back (definition or explanation), and an optional explanation for more context.
 
@@ -60,6 +60,11 @@ export async function generateFlashcardsFromText(
   }
   `;
 
+  const messages = [
+    {role: 'system', content: systemPrompt},
+    {role: 'user', content: userPrompt}
+  ];
+
   try {
     const response = await fetch(
       'https://api.openai.com/v1/chat/completions',
@@ -71,10 +76,7 @@ export async function generateFlashcardsFromText(
         },
         body: JSON.stringify({
           model: 'gpt-4o',
-          messages: [
-            {role: 'system', content: systemPrompt},
-            {role: 'user', content: prompt}
-          ],
+          messages: messages,
           response_format: {type: 'json_object'},
         }),
       }

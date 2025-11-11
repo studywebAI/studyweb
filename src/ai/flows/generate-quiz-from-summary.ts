@@ -34,7 +34,7 @@ export type GenerateQuizFromSummaryOutput = z.infer<typeof GenerateQuizFromSumma
  * @returns A promise that resolves to the generated quiz.
  */
 export async function generateQuizFromSummary(input: GenerateQuizFromSummaryInput): Promise<GenerateQuizFromSummaryOutput> {
-  const prompt = `You are a quiz generator. Generate a quiz based on the following summary.
+  const userPrompt = `You are a quiz generator. Generate a quiz based on the following summary.
 
   Summary: ${input.summaryContent}
 
@@ -58,6 +58,11 @@ export async function generateQuizFromSummary(input: GenerateQuizFromSummaryInpu
 }
 `;
 
+  const messages = [
+    {role: 'system', content: systemPrompt},
+    {role: 'user', content: userPrompt}
+  ];
+
   try {
     const response = await fetch(
       'https://api.openai.com/v1/chat/completions',
@@ -69,10 +74,7 @@ export async function generateQuizFromSummary(input: GenerateQuizFromSummaryInpu
         },
         body: JSON.stringify({
           model: 'gpt-4o',
-          messages: [
-            {role: 'system', content: systemPrompt},
-            {role: 'user', content: prompt}
-          ],
+          messages: messages,
           response_format: {type: 'json_object'},
         }),
       }

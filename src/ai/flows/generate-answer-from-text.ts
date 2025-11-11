@@ -35,7 +35,7 @@ export type GenerateAnswerFromTextOutput = z.infer<
 export async function generateAnswerFromText(
   input: GenerateAnswerFromTextInput
 ): Promise<GenerateAnswerFromTextOutput> {
-  const prompt = `You are a helpful AI assistant. Answer the user's question based on the conversation history.
+  const userPrompt = `Answer the user's question based on the conversation history.
 
   ${
     input.history
@@ -49,7 +49,7 @@ export async function generateAnswerFromText(
   Question: ${input.text}
   `;
 
-  const systemPrompt = `You must respond with a valid JSON object matching the following schema:
+  const systemPrompt = `You are a helpful AI assistant. You must respond with a valid JSON object matching the following schema:
   {
     "answer": "The generated answer to the question."
   }
@@ -62,7 +62,7 @@ export async function generateAnswerFromText(
     },
     {
       role: 'user',
-      content: prompt,
+      content: userPrompt,
     },
   ];
 
