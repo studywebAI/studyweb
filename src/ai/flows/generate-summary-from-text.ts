@@ -35,10 +35,12 @@ export async function generateSummaryFromText(
 const prompt = ai.definePrompt({
   name: 'generateSummaryFromTextPrompt',
   input: {schema: GenerateSummaryFromTextInputSchema},
-  output: {schema: GenerateSummaryFromTextOutputSchema},
   model: googleAI.model('gemini-1.5-flash'),
   prompt: `You are an expert in summarizing text. Generate a concise summary of the following text.
   
+  Respond with a valid JSON object matching the following schema:
+  ${JSON.stringify(GenerateSummaryFromTextOutputSchema.parse({summary: ''}))}
+
   Text: {{{text}}}
   `,
 });
@@ -50,7 +52,16 @@ const generateSummaryFromTextFlow = ai.defineFlow(
     outputSchema: GenerateSummaryFromTextOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
-    return output!;
+    const response = await prompt(input);
+    const text = response.text;
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      const jsonText = text.match(/```json\n([\s\S]*)\n```/);
+      if (jsonText && jsonText[1]) {
+        return JSON.parse(jsonText[1]);
+      }
+      throw new Error('Failed to parse LLM response as JSON');
+    }
   }
 );

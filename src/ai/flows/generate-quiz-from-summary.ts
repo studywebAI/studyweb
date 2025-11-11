@@ -49,17 +49,19 @@ export async function generateQuizFromSummary(input: GenerateQuizFromSummaryInpu
 const generateQuizPrompt = ai.definePrompt({
   name: 'generateQuizFromSummaryPrompt',
   input: {schema: GenerateQuizFromSummaryInputSchema},
-  output: {schema: GenerateQuizFromSummaryOutputSchema},
   model: googleAI.model('gemini-1.5-flash'),
   prompt: `You are a quiz generator. Generate a quiz based on the following summary.
 
-Summary: {{{summaryContent}}}
+  Respond with a valid JSON object matching the following schema:
+  ${JSON.stringify(GenerateQuizFromSummaryOutputSchema.parse({questions: []}))}
 
-Options: {{{options}}}
+  Summary: {{{summaryContent}}}
 
-Each question should have 4 options and a correct answer index.
+  Options: {{{options}}}
 
-Ensure the questions and answers are accurate and relevant to the summary.
+  Each question should have 4 options and a correct answer index.
+
+  Ensure the questions and answers are accurate and relevant to the summary.
 `, 
 });
 
@@ -70,7 +72,16 @@ const generateQuizFromSummaryFlow = ai.defineFlow(
     outputSchema: GenerateQuizFromSummaryOutputSchema,
   },
   async input => {
-    const {output} = await generateQuizPrompt(input);
-    return output!;
+    const response = await generateQuizPrompt(input);
+    const text = response.text;
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      const jsonText = text.match(/```json\n([\s\S]*)\n```/);
+      if (jsonText && jsonText[1]) {
+        return JSON.parse(jsonText[1]);
+      }
+      throw new Error('Failed to parse LLM response as JSON');
+    }
   }
 );

@@ -13,10 +13,15 @@ import {z} from 'genkit';
 
 const GenerateAnswerFromTextInputSchema = z.object({
   text: z.string().describe('The question to answer.'),
-  history: z.array(z.object({
-    role: z.enum(['user', 'ai']),
-    content: z.string(),
-  })).optional().describe('The conversation history.'),
+  history: z
+    .array(
+      z.object({
+        role: z.enum(['user', 'ai']),
+        content: z.string(),
+      })
+    )
+    .optional()
+    .describe('The conversation history.'),
 });
 export type GenerateAnswerFromTextInput = z.infer<
   typeof GenerateAnswerFromTextInputSchema
@@ -39,9 +44,11 @@ export async function generateAnswerFromText(
 const prompt = ai.definePrompt({
   name: 'generateAnswerFromTextPrompt',
   input: {schema: GenerateAnswerFromTextInputSchema},
-  output: {schema: GenerateAnswerFromTextOutputSchema},
   model: googleAI.model('gemini-1.5-flash'),
   prompt: `You are a helpful AI assistant. Answer the user's question based on the conversation history.
+
+  Respond with a valid JSON object matching the following schema:
+  ${JSON.stringify(GenerateAnswerFromTextOutputSchema.parse({answer: ''}))}
 
   {{#if history}}
   History:
@@ -61,7 +68,17 @@ const generateAnswerFromTextFlow = ai.defineFlow(
     outputSchema: GenerateAnswerFromTextOutputSchema,
   },
   async input => {
-    const {output} = await prompt(input);
-    return output!;
+    const response = await prompt(input);
+    const text = response.text;
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      // The model may not have returned valid JSON, so we'll try to extract it.
+      const jsonText = text.match(/```json\n([\s\S]*)\n```/);
+      if (jsonText && jsonText[1]) {
+        return JSON.parse(jsonText[1]);
+      }
+      throw new Error('Failed to parse LLM response as JSON');
+    }
   }
 );
