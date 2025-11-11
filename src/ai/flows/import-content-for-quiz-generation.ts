@@ -1,14 +1,8 @@
 'use server';
 /**
- * @fileOverview This file defines a Genkit flow that imports content from various sources and generates a quiz.
- *
- * - importContentForQuizGeneration - A function that handles the content import and quiz generation process.
- * - ImportContentForQuizGenerationInput - The input type for the importContentForQuizGeneration function.
- * - ImportContentForQuizGenerationOutput - The return type for the importContentForQuizGeneration function.
+ * @fileOverview This file defines a function that imports content and generates a quiz using the OpenAI API.
  */
 
-import {ai} from '@/ai/genkit';
-import {googleAI} from '@genkit-ai/google-genai';
 import {z} from 'genkit';
 
 const ImportContentForQuizGenerationInputSchema = z.object({
@@ -41,14 +35,7 @@ export type ImportContentForQuizGenerationOutput = z.infer<
 export async function importContentForQuizGeneration(
   input: ImportContentForQuizGenerationInput
 ): Promise<ImportContentForQuizGenerationOutput> {
-  return importContentForQuizGenerationFlow(input);
-}
-
-const prompt = ai.definePrompt({
-  name: 'importContentForQuizGenerationPrompt',
-  input: {schema: ImportContentForQuizGenerationInputSchema},
-  model: googleAI.model('models/gemini-2.5-flash-preview'),
-  prompt: `Generate a quiz from the following content.
+  const prompt = `Generate a quiz from the following content.
 
   Respond with a valid JSON object matching the following schema:
   ${JSON.stringify(
@@ -64,29 +51,46 @@ const prompt = ai.definePrompt({
     })
   )}
   
-  The quiz should have {{{options.question_count}}} questions and the difficulty should be {{{options.difficulty}}}.
+  The quiz should have ${input.options?.question_count || 10} questions and the difficulty should be ${input.options?.difficulty || 'medium'}.
   
-  Content: {{{content}}}`,
-});
+  Content: ${input.content}`;
 
-const importContentForQuizGenerationFlow = ai.defineFlow(
-  {
-    name: 'importContentForQuizGenerationFlow',
-    inputSchema: ImportContentForQuizGenerationInputSchema,
-    outputSchema: ImportContentForQuizGenerationOutputSchema,
-  },
-  async input => {
-    const response = await prompt(input);
-    const text = response.text;
-    try {
-      return JSON.parse(text);
-    } catch (e) {
-      // The model may not have returned valid JSON, so we'll try to extract it.
-      const jsonText = text.match(/```json\n([\s\S]*)\n```/);
-      if (jsonText && jsonText[1]) {
-        return JSON.parse(jsonText[1]);
+  try {
+    const response = await fetch(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [{role: 'user', content: prompt}],
+          response_format: {type: 'json_object'},
+        }),
       }
+    );
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(
+        `OpenAI API request failed with status ${response.status}: ${errorBody}`
+      );
+    }
+
+    const data = await response.json();
+    const content = data.choices[0].message.content;
+
+    try {
+      const parsed = JSON.parse(content);
+      return ImportContentForQuizGenerationOutputSchema.parse(parsed);
+    } catch (e) {
+      console.error('Failed to parse OpenAI response as JSON:', content);
       throw new Error('Failed to parse LLM response as JSON');
     }
+  } catch (error) {
+    console.error('Error calling OpenAI API:', error);
+    throw new Error('Failed to generate quiz.');
   }
-);
+}

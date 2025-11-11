@@ -1,16 +1,8 @@
 'use server';
 /**
- * @fileOverview This file defines a Genkit flow for generating a quiz from a summary.
- *
- * It takes a summary content and generates a quiz with questions, options, and explanations.
- *
- * @example
- * // Example usage:
- * // const result = await generateQuizFromSummary({ summaryContent: 'summary text here', options: { questionCount: 5 } });
+ * @fileOverview This file defines a function for generating a quiz from a summary using the OpenAI API.
  */
 
-import {ai} from '@/ai/genkit';
-import {googleAI} from '@genkit-ai/google-genai';
 import {z} from 'genkit';
 
 const GenerateQuizFromSummaryInputSchema = z.object({
@@ -42,15 +34,7 @@ export type GenerateQuizFromSummaryOutput = z.infer<typeof GenerateQuizFromSumma
  * @returns A promise that resolves to the generated quiz.
  */
 export async function generateQuizFromSummary(input: GenerateQuizFromSummaryInput): Promise<GenerateQuizFromSummaryOutput> {
-  const result = await generateQuizFromSummaryFlow(input);
-  return result;
-}
-
-const generateQuizPrompt = ai.definePrompt({
-  name: 'generateQuizFromSummaryPrompt',
-  input: {schema: GenerateQuizFromSummaryInputSchema},
-  model: googleAI.model('models/gemini-2.5-flash-preview'),
-  prompt: `You are a quiz generator. Generate a quiz based on the following summary.
+  const prompt = `You are a quiz generator. Generate a quiz based on the following summary.
 
   Respond with a valid JSON object matching the following schema:
   ${JSON.stringify(
@@ -66,33 +50,50 @@ const generateQuizPrompt = ai.definePrompt({
     })
   )}
 
-  Summary: {{{summaryContent}}}
+  Summary: ${input.summaryContent}
 
-  Options: {{{options}}}
+  Options: ${JSON.stringify(input.options)}
 
   Each question should have 4 options and a correct answer index.
 
   Ensure the questions and answers are accurate and relevant to the summary.
-`,
-});
-
-const generateQuizFromSummaryFlow = ai.defineFlow(
-  {
-    name: 'generateQuizFromSummaryFlow',
-    inputSchema: GenerateQuizFromSummaryInputSchema,
-    outputSchema: GenerateQuizFromSummaryOutputSchema,
-  },
-  async input => {
-    const response = await generateQuizPrompt(input);
-    const text = response.text;
-    try {
-      return JSON.parse(text);
-    } catch (e) {
-      const jsonText = text.match(/```json\n([\s\S]*)\n```/);
-      if (jsonText && jsonText[1]) {
-        return JSON.parse(jsonText[1]);
+`;
+  try {
+    const response = await fetch(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [{role: 'user', content: prompt}],
+          response_format: {type: 'json_object'},
+        }),
       }
+    );
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(
+        `OpenAI API request failed with status ${response.status}: ${errorBody}`
+      );
+    }
+
+    const data = await response.json();
+    const content = data.choices[0].message.content;
+
+    try {
+      const parsed = JSON.parse(content);
+      return GenerateQuizFromSummaryOutputSchema.parse(parsed);
+    } catch (e) {
+      console.error('Failed to parse OpenAI response as JSON:', content);
       throw new Error('Failed to parse LLM response as JSON');
     }
+  } catch (error) {
+    console.error('Error calling OpenAI API:', error);
+    throw new Error('Failed to generate quiz.');
   }
-);
+}

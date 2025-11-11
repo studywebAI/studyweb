@@ -1,14 +1,8 @@
 'use server';
 /**
- * @fileOverview This file defines a Genkit flow for generating concise summaries from text.
- *
- * - generateSummaryFromText - A function that takes text as input and returns a summarized version.
- * - GenerateSummaryFromTextInput - The input type for the generateSummaryFromText function.
- * - GenerateSummaryFromTextOutput - The return type for the generateSummaryFromText function.
+ * @fileOverview This file defines a function for generating concise summaries from text using the OpenAI API.
  */
 
-import {ai} from '@/ai/genkit';
-import {googleAI} from '@genkit-ai/google-genai';
 import {z} from 'genkit';
 
 const GenerateSummaryFromTextInputSchema = z.object({
@@ -28,40 +22,50 @@ export type GenerateSummaryFromTextOutput = z.infer<
 export async function generateSummaryFromText(
   input: GenerateSummaryFromTextInput
 ): Promise<GenerateSummaryFromTextOutput> {
-  const result = await generateSummaryFromTextFlow(input);
-  return result;
-}
-
-const prompt = ai.definePrompt({
-  name: 'generateSummaryFromTextPrompt',
-  input: {schema: GenerateSummaryFromTextInputSchema},
-  model: googleAI.model('models/gemini-2.5-flash-preview'),
-  prompt: `You are an expert in summarizing text. Generate a concise summary of the following text.
+  const prompt = `You are an expert in summarizing text. Generate a concise summary of the following text.
   
   Respond with a valid JSON object matching the following schema:
   ${JSON.stringify(GenerateSummaryFromTextOutputSchema.parse({summary: ''}))}
 
-  Text: {{{text}}}
-  `,
-});
+  Text: ${input.text}
+  `;
 
-const generateSummaryFromTextFlow = ai.defineFlow(
-  {
-    name: 'generateSummaryFromTextFlow',
-    inputSchema: GenerateSummaryFromTextInputSchema,
-    outputSchema: GenerateSummaryFromTextOutputSchema,
-  },
-  async input => {
-    const response = await prompt(input);
-    const text = response.text;
-    try {
-      return JSON.parse(text);
-    } catch (e) {
-      const jsonText = text.match(/```json\n([\s\S]*)\n```/);
-      if (jsonText && jsonText[1]) {
-        return JSON.parse(jsonText[1]);
+  try {
+    const response = await fetch(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [{role: 'user', content: prompt}],
+          response_format: {type: 'json_object'},
+        }),
       }
+    );
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(
+        `OpenAI API request failed with status ${response.status}: ${errorBody}`
+      );
+    }
+
+    const data = await response.json();
+    const content = data.choices[0].message.content;
+
+    try {
+      const parsed = JSON.parse(content);
+      return GenerateSummaryFromTextOutputSchema.parse(parsed);
+    } catch (e) {
+      console.error('Failed to parse OpenAI response as JSON:', content);
       throw new Error('Failed to parse LLM response as JSON');
     }
+  } catch (error) {
+    console.error('Error calling OpenAI API:', error);
+    throw new Error('Failed to generate summary.');
   }
-);
+}

@@ -1,16 +1,16 @@
 import {genkit} from 'genkit';
-import {googleAI} from '@genkit-ai/google-genai';
+import {openai} from 'genkit-plugin-openai';
 
-// The API key is read from the GEMINI_API_KEY environment variable.
+// The API key is read from the OPENAI_API_KEY environment variable.
 // This is a secure way to handle secrets and is configured in your project's settings.
-const apiKey = process.env.GEMINI_API_KEY;
+const apiKey = process.env.OPENAI_API_KEY;
 
 if (!apiKey) {
   console.warn(
-    'Gemini API key is not configured. Please set the GEMINI_API_KEY environment variable in your project settings.'
+    'OpenAI API key is not configured. Please set the OPENAI_API_KEY environment variable in your project settings.'
   );
 }
 
-export const ai = genkit({
-  plugins: [googleAI({apiKey, apiVersion: 'v1beta'})],
-});
+// Note: We are initializing Genkit without any plugins since we are calling OpenAI directly.
+// This file is kept to maintain the project structure, but `ai` object is not used in the flows.
+export const ai = genkit();

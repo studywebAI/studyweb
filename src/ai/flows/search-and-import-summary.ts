@@ -1,18 +1,11 @@
 'use server';
 
 /**
- * @fileOverview Implements the search and import summary flow.
- *
- * This flow allows users to search for existing summaries using keywords and import them into other tools, facilitating content reuse.
- *
- * @fileOverview
- * - searchAndImportSummary - A function that handles the search and import process.
- * - SearchAndImportSummaryInput - The input type for the searchAndImportSummary function.
- * - SearchAndImportSummaryOutput - The return type for the searchAndImportSummary function.
+ * @fileOverview This file is being temporarily repurposed.
+ * The Genkit tools and flows are being bypassed to use direct API calls.
+ * This functionality will be restored in a future update.
  */
 
-import {ai} from '@/ai/genkit';
-import {googleAI} from '@genkit-ai/google-genai';
 import {z} from 'genkit';
 
 const SearchAndImportSummaryInputSchema = z.object({
@@ -42,130 +35,59 @@ const SearchAndImportSummaryOutputSchema = z.object({
 });
 export type SearchAndImportSummaryOutput = z.infer<typeof SearchAndImportSummaryOutputSchema>;
 
+// This function is temporarily disabled and will return an empty result.
 export async function searchAndImportSummary(input: SearchAndImportSummaryInput): Promise<SearchAndImportSummaryOutput> {
-  return searchAndImportSummaryFlow(input);
-}
+  console.warn("searchAndImportSummary is temporarily disabled.");
+  
+  const output: SearchAndImportSummaryOutput = {
+    matches: []
+  };
 
-const searchItems = ai.defineTool({
-  name: 'searchItems',
-  description: 'Search user items based on a query and optional type filters.',
-  inputSchema: z.object({
-    query: z.string().describe('The search query.'),
-    typeFilter: z.array(z.string()).optional().describe('Optional filters for item types.'),
-    limit: z.number().default(5).describe('Maximum number of results to return.'),
-  }),
-  outputSchema: z.array(
-    z.object({
-      item_id: z.string(),
-      title: z.string(),
-      type: z.string(),
-      description: z.string(),
-      similarity: z.number(),
-      snippet: z.string().optional(),
-    })
-  ),
-  async handler(input) {
-    const response = await fetch(process.env.NEXT_PUBLIC_API_URL + '/api/items/search', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(input),
-    });
-
-    if (!response.ok) {
-      console.error('Search API error:', response.status, await response.text());
-      throw new Error(`Search failed: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return data.matches || [];
-  },
-});
-
-const importItem = ai.defineTool({
-  name: 'importItem',
-  description: 'Imports an item into a specified tool, like creating a quiz from a summary.',
-  inputSchema: z.object({
-    sourceItemId: z.string().describe('The ID of the item to import.'),
-    targetTool: z.string().describe('The tool to import the item into (e.g., quiz, flashcards).'),
-    options: z.record(z.any()).optional().describe('Additional options for the import process.'),
-  }),
-  outputSchema: z.object({
-    newItemId: z.string(),
-    newItemMeta: z.record(z.any()).optional(),
-  }),
-  async handler(input) {
-    const response = await fetch(process.env.NEXT_PUBLIC_API_URL + '/api/items/import', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(input),
-    });
-
-    if (!response.ok) {
-      console.error('Import API error:', response.status, await response.text());
-      throw new Error(`Import failed: ${response.status}`);
-    }
-
-    const data = await response.json();
-    return {newItemId: data.new_item_id, newItemMeta: data.new_item_meta};
-  },
-});
-
-const searchAndImportPrompt = ai.definePrompt({
-  name: 'searchAndImportPrompt',
-  input: {
-    schema: SearchAndImportSummaryInputSchema,
-  },
-  tools: [searchItems, importItem],
-  prompt: `You are a helpful assistant that helps users search for and import existing content.
-
-  The user may want to search for content, import content or both.
-
-  If the user provides a "query" then use the "searchItems" tool to find relevant content.
-  If the user provides "sourceItemId" and "targetTool" then use the "importItem" tool to import the content into the specified tool.
-
-  Return the "matches" from the searchItems tool and the "newItemId" from the importItem tool.  If importItem is used, include the "newItemMeta" as well.
-
-  Consider these safety settings:
-  BLOCK_NONE for HARM_CATEGORY_DANGEROUS_CONTENT
-  BLOCK_ONLY_HIGH for HARM_CATEGORY_HATE_SPEECH,
-  BLOCK_MEDIUM_AND_ABOVE for HARM_CATEGORY_HARASSMENT and HARM_CATEGORY_SEXUALLY_EXPLICIT.
-
-  Always respond in JSON format.
-`,
-  config: {
-    safetySettings: [
-      {
-        category: 'HARM_CATEGORY_DANGEROUS_CONTENT',
-        threshold: 'BLOCK_NONE',
-      },
-      {
-        category: 'HARM_CATEGORY_HATE_SPEECH',
-        threshold: 'BLOCK_ONLY_HIGH',
-      },
-      {
-        category: 'HARM_CATEGORY_HARASSMENT',
-        threshold: 'BLOCK_MEDIUM_AND_ABOVE',
-      },
-      {
-        category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT',
-        threshold: 'BLOCK_MEDIUM_AND_ABOVE',
-      },
-    ],
-  },
-});
-
-const searchAndImportSummaryFlow = ai.defineFlow(
-  {
-    name: 'searchAndImportSummaryFlow',
-    inputSchema: SearchAndImportSummaryInputSchema,
-    outputSchema: SearchAndImportSummaryOutputSchema,
-  },
-  async input => {
-    const {output} = await searchAndImportPrompt(input);
-    return output!;
+  if (input.query) {
+     try {
+        const response = await fetch(process.env.NEXT_PUBLIC_API_URL + '/api/items/search', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            query: input.query,
+            typeFilter: input.typeFilter,
+            limit: input.limit
+        }),
+        });
+        if (response.ok) {
+            const data = await response.json();
+            output.matches = data.matches || [];
+        }
+     } catch (e) {
+        console.error("Search failed", e);
+     }
   }
-);
+
+  if (input.sourceItemId && input.targetTool) {
+      try {
+        const response = await fetch(process.env.NEXT_PUBLIC_API_URL + '/api/items/import', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                sourceItemId: input.sourceItemId,
+                targetTool: input.targetTool,
+                options: input.options,
+            }),
+        });
+         if (response.ok) {
+            const data = await response.json();
+            output.newItemId = data.new_item_id;
+            output.newItemMeta = data.new_item_meta;
+        }
+      } catch(e) {
+        console.error("Import failed", e);
+      }
+  }
+
+
+  return output;
+}
