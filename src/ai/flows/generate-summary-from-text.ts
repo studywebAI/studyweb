@@ -34,9 +34,12 @@ export async function generateSummaryFromText(
 const prompt = ai.definePrompt({
   name: 'generateSummaryFromTextPrompt',
   input: {schema: GenerateSummaryFromTextInputSchema},
-  output: {schema: GenerateSummaryFromTextOutputSchema},
+  output: {format: 'json'},
   model: googleAI.model('gemini-1.5-flash'),
-  prompt: `Summarize the following text:\n\n{{text}}`,
+  prompt: `Summarize the following text and respond in JSON format that conforms to this schema:
+  ${JSON.stringify(GenerateSummaryFromTextOutputSchema.jsonSchema)}
+  
+  Text: {{text}}`,
 });
 
 const generateSummaryFromTextFlow = ai.defineFlow(

@@ -38,7 +38,7 @@ export async function generateAnswerFromText(
 const prompt = ai.definePrompt({
   name: 'generateAnswerFromTextPrompt',
   input: {schema: GenerateAnswerFromTextInputSchema},
-  output: {schema: GenerateAnswerFromTextOutputSchema},
+  output: {format: 'json'},
   model: googleAI.model('gemini-1.5-flash'),
   prompt: `You are a helpful AI assistant. Answer the user's question based on the conversation history.
 
@@ -50,6 +50,9 @@ const prompt = ai.definePrompt({
   {{/if}}
 
   Question: {{text}}
+  
+  Respond in JSON format that conforms to this schema:
+  ${JSON.stringify(GenerateAnswerFromTextOutputSchema.jsonSchema)}
   Answer:
   `,
 });

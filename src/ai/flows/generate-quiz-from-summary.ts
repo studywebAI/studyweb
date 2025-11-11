@@ -48,7 +48,7 @@ export async function generateQuizFromSummary(input: GenerateQuizFromSummaryInpu
 const generateQuizPrompt = ai.definePrompt({
   name: 'generateQuizFromSummaryPrompt',
   input: {schema: GenerateQuizFromSummaryInputSchema},
-  output: {schema: GenerateQuizFromSummaryOutputSchema},
+  output: {format: 'json'},
   model: googleAI.model('gemini-1.5-flash'),
   prompt: `You are a quiz generator. Generate a quiz based on the following summary.
 
@@ -60,8 +60,9 @@ Each question should have 4 options and a correct answer index.
 
 Ensure the questions and answers are accurate and relevant to the summary.
 
-Output a JSON object containing an array of question objects.
-`, // Removed example from the prompt
+Output a JSON object containing an array of question objects that conforms to this schema:
+${JSON.stringify(GenerateQuizFromSummaryOutputSchema.jsonSchema)}
+`, 
 });
 
 const generateQuizFromSummaryFlow = ai.defineFlow(
