@@ -3,7 +3,7 @@
  * @fileOverview This file defines a function that imports content and generates a quiz using an AI model.
  */
 
-import {z} from 'genkit';
+import {z} from 'zod';
 import OpenAI from 'openai';
 import {ImportContentForQuizGenerationInputSchema, ImportContentForQuizGenerationOutputSchema} from './schemas';
 

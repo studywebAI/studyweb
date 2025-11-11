@@ -1,6 +1,5 @@
-'use server';
 
-import {z} from 'genkit';
+import {z} from 'zod';
 
 export const GenerateAnswerFromTextInputSchema = z.object({
   text: z.string().describe('The question to answer.'),

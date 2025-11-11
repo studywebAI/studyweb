@@ -8,7 +8,7 @@
  * - GenerateFlashcardsFromTextOutput - The return type for the generateFlashcardsFromText function.
  */
 
-import {z} from 'genkit';
+import {z} from 'zod';
 import OpenAI from 'openai';
 import {
     GenerateFlashcardsFromTextInputSchema,

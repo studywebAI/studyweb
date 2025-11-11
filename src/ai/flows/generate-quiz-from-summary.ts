@@ -3,7 +3,7 @@
  * @fileOverview This file defines a function for generating a quiz from a summary using an AI model.
  */
 
-import {z} from 'genkit';
+import {z} from 'zod';
 import OpenAI from 'openai';
 import { GenerateQuizFromSummaryInputSchema, GenerateQuizFromSummaryOutputSchema } from './schemas';
 

@@ -7,7 +7,7 @@
  * - GenerateAnswerFromTextOutput - The return type for the generateAnswerFromtext function.
  */
 
-import {z} from 'genkit';
+import {z} from 'zod';
 import OpenAI from 'openai';
 import {GenerateAnswerFromTextInputSchema, GenerateAnswerFromTextOutputSchema} from './schemas';
 
