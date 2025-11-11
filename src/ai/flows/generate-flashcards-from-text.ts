@@ -43,6 +43,7 @@ const prompt = ai.definePrompt({
   name: 'generateFlashcardsFromTextPrompt',
   input: {schema: GenerateFlashcardsFromTextInputSchema},
   output: {schema: GenerateFlashcardsFromTextOutputSchema},
+  model: googleAI.model('gemini-1.0-pro'),
   prompt: `You are an expert at creating effective flashcards for learning.
 
   Generate a set of flashcards from the following text. Each flashcard should have a front (term or concept), a back (definition or explanation), and an optional explanation for more context.
