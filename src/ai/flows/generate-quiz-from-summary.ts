@@ -49,7 +49,7 @@ const generateQuizPrompt = ai.definePrompt({
   name: 'generateQuizFromSummaryPrompt',
   input: {schema: GenerateQuizFromSummaryInputSchema},
   output: {schema: GenerateQuizFromSummaryOutputSchema},
-  model: 'gemini-pro',
+  model: googleAI.model('gemini-pro'),
   prompt: `You are a quiz generator. Generate a quiz based on the following summary.
 
 Summary: {{{summaryContent}}}
