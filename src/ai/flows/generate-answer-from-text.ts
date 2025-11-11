@@ -61,7 +61,7 @@ export async function generateAnswerFromText(
     const parsed = GenerateAnswerFromTextOutputSchema.parse(JSON.parse(content));
     return parsed;
   } catch (error: any) {
-    console.error("REAL OPENAI ERROR:", JSON.stringify(error, null, 2));
+    console.error("Error generating answer:", error);
     throw new Error('Failed to generate answer.');
   }
 }

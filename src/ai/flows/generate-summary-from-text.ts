@@ -51,7 +51,7 @@ export async function generateSummaryFromText(
     return parsed;
 
   } catch (error: any) {
-    console.error("REAL OPENAI ERROR:", JSON.stringify(error, null, 2));
+    console.error("Error generating summary:", error);
     throw new Error('Failed to generate summary.');
   }
 }

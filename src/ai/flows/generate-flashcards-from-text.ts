@@ -58,7 +58,7 @@ export async function generateFlashcardsFromText(
     return parsed;
 
   } catch (error: any) {
-    console.error("REAL OPENAI ERROR:", JSON.stringify(error, null, 2));
+    console.error("Error generating flashcards:", error);
     throw new Error('Failed to generate flashcards.');
   }
 }

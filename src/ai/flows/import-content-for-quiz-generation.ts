@@ -55,7 +55,7 @@ export async function importContentForQuizGeneration(
     return parsed;
 
   } catch (error: any) {
-    console.error("REAL OPENAI ERROR:", JSON.stringify(error, null, 2));
+    console.error("Error generating quiz:", error);
     throw new Error('Failed to generate quiz.');
   }
 }
