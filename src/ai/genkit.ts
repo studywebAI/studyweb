@@ -1,3 +1,4 @@
+'use client';
 import {genkit} from 'genkit';
 import {openai} from 'genkit-plugin-openai';
 
