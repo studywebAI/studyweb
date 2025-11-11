@@ -39,7 +39,6 @@ const prompt = ai.definePrompt({
   name: 'generateAnswerFromTextPrompt',
   input: {schema: GenerateAnswerFromTextInputSchema},
   output: {schema: GenerateAnswerFromTextOutputSchema},
-  model: googleAI.model('gemini-pro'),
   prompt: `You are a helpful AI assistant. Answer the user's question based on the conversation history.
 
   {{#if history}}
