@@ -37,7 +37,7 @@ export async function generateSummaryFromText(
     
     return result;
 
-  } catch (error: any) => {
+  } catch (error: any) {
     console.error('Error generating summary:', error);
     throw error;
   }
