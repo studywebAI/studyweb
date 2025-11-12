@@ -1,26 +1,27 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Layers } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Layers, Check, X, RotateCw, BarChart, ArrowRight } from 'lucide-react';
 import { ToolOptionsBar, type FlashcardOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
 import { handleGenerateFlashcards } from '@/app/actions';
 import { Skeleton } from '../ui/skeleton';
 import { Card, CardContent } from '../ui/card';
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from '../ui/carousel';
 import { useApp, type RecentItem } from '../app-provider';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { Button } from '../ui/button';
+import { cn } from '@/lib/utils';
 
 interface Flashcard {
   front: string;
   back: string;
   explanation: string;
+}
+
+interface SessionCard extends Flashcard {
+    isCorrect: boolean | null;
+    timeSpent: number;
+    flips: number;
 }
 
 // Helper function to determine the provider from a model name
@@ -33,11 +34,22 @@ function getProviderFromModel(model: string): 'openai' | 'google' {
 
 export function FlashcardsTool() {
   const [options, setOptions] = useState<FlashcardOptions>({ cardCount: 20 });
-  const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
+  const [sessionCards, setSessionCards] = useState<SessionCard[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sourceText, setSourceText] = useState('');
+  const [currentCardIndex, setCurrentCardIndex] = useState(0);
+  const [isFlipped, setIsFlipped] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const cardStartTime = useRef(Date.now());
   const { addRecent, globalModel, modelOverrides, apiKeys } = useApp();
+
+  useEffect(() => {
+    // Reset timer when card changes
+    cardStartTime.current = Date.now();
+    setIsFlipped(false);
+  }, [currentCardIndex]);
+
 
   const handleOptionsChange = (newOptions: Partial<FlashcardOptions>) => {
     setOptions((prev) => ({ ...prev, ...newOptions }));
@@ -45,9 +57,12 @@ export function FlashcardsTool() {
 
   const generateFlashcards = async (text: string) => {
     setIsLoading(true);
-    setFlashcards([]);
+    setSessionCards([]);
     setError(null);
     setSourceText(text);
+    setCurrentCardIndex(0);
+    setShowResults(false);
+    setIsFlipped(false);
 
     const model = modelOverrides.flashcards || globalModel;
     const provider = getProviderFromModel(model);
@@ -59,14 +74,19 @@ export function FlashcardsTool() {
         return;
     }
 
-
     try {
       const result = await handleGenerateFlashcards({ 
           text, 
           model,
           apiKey: { provider, key: apiKey }
       });
-      setFlashcards(result.cards);
+      const newSessionCards = result.cards.map(card => ({
+          ...card,
+          isCorrect: null,
+          timeSpent: 0,
+          flips: 0
+      }));
+      setSessionCards(newSessionCards);
       addRecent({
         title: text.substring(0, 30) + '...',
         type: 'Flashcards',
@@ -83,6 +103,30 @@ export function FlashcardsTool() {
   
   const handleImport = (item: RecentItem) => {
     generateFlashcards(item.content);
+  };
+  
+  const handleFlip = () => {
+    setIsFlipped(!isFlipped);
+    if (!isFlipped) { // Only count flips to the back
+        const newCards = [...sessionCards];
+        newCards[currentCardIndex].flips += 1;
+        setSessionCards(newCards);
+    }
+  }
+
+  const handleMarkAnswer = (isCorrect: boolean) => {
+    const timeSpent = (Date.now() - cardStartTime.current) / 1000;
+    const newCards = [...sessionCards];
+    newCards[currentCardIndex].isCorrect = isCorrect;
+    newCards[currentCardIndex].timeSpent += timeSpent;
+    setSessionCards(newCards);
+
+    if (currentCardIndex < sessionCards.length - 1) {
+        setCurrentCardIndex(currentCardIndex + 1);
+    } else {
+        // Last card, show results
+        setShowResults(true);
+    }
   };
 
   const ErrorDisplay = ({ message }: { message: string }) => (
@@ -117,33 +161,66 @@ export function FlashcardsTool() {
     </div>
   );
 
-  const FlashcardView = ({ cards }: { cards: Flashcard[] }) => (
+  const FlashcardView = ({ card, isFlipped }: { card: Flashcard, isFlipped: boolean }) => (
     <div className="flex-grow flex flex-col items-center justify-center p-4 md:p-6">
-      <Carousel className="w-full max-w-md">
-        <CarouselContent>
-          {cards.map((card, index) => (
-            <CarouselItem key={index}>
-              <div className="p-1">
-                <Card className="group aspect-video [perspective:1000px]">
-                  <CardContent className="relative h-full w-full rounded-lg shadow-md transition-all duration-500 [transform-style:preserve-3d] group-hover:[transform:rotateY(180deg)]">
-                    <div className="absolute inset-0 flex items-center justify-center bg-card p-6 [backface-visibility:hidden]">
-                      <h2 className="text-center font-bold text-2xl">{card.front}</h2>
-                    </div>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-card p-6 [transform:rotateY(180deg)] [backface-visibility:hidden]">
-                       <h3 className="text-center text-xl font-semibold">{card.back}</h3>
-                       <p className="mt-2 text-center text-sm text-muted-foreground">{card.explanation}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </CarouselItem>
-          ))}
-        </CarouselContent>
-        <CarouselPrevious />
-        <CarouselNext />
-      </Carousel>
+       <div className="w-full max-w-md mb-4">
+        <p className="text-center text-muted-foreground">Card {currentCardIndex + 1} of {sessionCards.length}</p>
+        <div className="w-full bg-muted rounded-full h-2.5 mt-2">
+            <div className="bg-primary h-2.5 rounded-full" style={{ width: `${((currentCardIndex + 1) / sessionCards.length) * 100}%` }}></div>
+        </div>
+      </div>
+      <Card className="w-full max-w-md aspect-video [perspective:1000px]">
+        <div 
+          className={cn(
+            "relative h-full w-full rounded-lg shadow-md transition-transform duration-500 [transform-style:preserve-3d]",
+            isFlipped && "[transform:rotateY(180deg)]"
+          )}
+        >
+          <CardContent className="absolute inset-0 flex items-center justify-center bg-card p-6 [backface-visibility:hidden]">
+            <h2 className="text-center font-bold text-2xl">{card.front}</h2>
+          </CardContent>
+          <CardContent className="absolute inset-0 flex flex-col items-center justify-center bg-card p-6 [transform:rotateY(180deg)] [backface-visibility:hidden]">
+            <h3 className="text-center text-xl font-semibold">{card.back}</h3>
+          </CardContent>
+        </div>
+      </Card>
+      <div className="w-full max-w-md mt-6 flex justify-center items-center gap-4">
+        {isFlipped ? (
+            <>
+                <Button variant="outline" size="lg" className="bg-red-500/10 border-red-500 text-red-600 hover:bg-red-500/20" onClick={() => handleMarkAnswer(false)}>
+                    <X className="mr-2" /> I didn't know it
+                </Button>
+                <Button variant="outline" size="lg" className="bg-green-500/10 border-green-500 text-green-600 hover:bg-green-500/20" onClick={() => handleMarkAnswer(true)}>
+                    <Check className="mr-2" /> I knew it
+                </Button>
+            </>
+        ) : (
+            <Button size="lg" onClick={handleFlip}>
+                <RotateCw className="mr-2"/>
+                Flip Card
+            </Button>
+        )}
+      </div>
     </div>
   );
+  
+  const ResultsScreen = () => {
+    // Basic results, will be expanded later
+    const correctCount = sessionCards.filter(c => c.isCorrect).length;
+    return (
+        <div className="flex-grow flex flex-col items-center justify-center p-4 md:p-6 text-center">
+            <BarChart className="w-16 h-16 text-primary mb-4" />
+            <h1 className="font-headline text-4xl font-bold mb-2">Session Complete!</h1>
+            <p className="text-2xl text-muted-foreground mb-8">
+                You scored {correctCount} out of {sessionCards.length}
+            </p>
+            <Button onClick={() => setShowResults(false)}>
+                Review Again <ArrowRight className="ml-2" />
+            </Button>
+        </div>
+    );
+  }
+
 
   const renderContent = () => {
     if (isLoading) {
@@ -152,8 +229,11 @@ export function FlashcardsTool() {
     if (error) {
       return <ErrorDisplay message={error} />;
     }
-    if (flashcards.length > 0) {
-      return <FlashcardView cards={flashcards} />;
+    if (showResults) {
+        return <ResultsScreen />;
+    }
+    if (sessionCards.length > 0) {
+      return <FlashcardView card={sessionCards[currentCardIndex]} isFlipped={isFlipped} />;
     }
     return <WelcomeScreen />;
   };
