@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Layers, Check, X, RotateCw, BarChart, ArrowRight, Timer, Eye, BrainCircuit, HelpCircle, Bot, Loader2 } from 'lucide-react';
+import { Layers, Check, X, RotateCw, BarChart, ArrowRight, Timer, Eye, BrainCircuit, HelpCircle, Bot, Loader2, Printer } from 'lucide-react';
 import { ToolOptionsBar, type FlashcardOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
 import { handleGenerateFlashcards, handleGenerateAnswer } from '@/app/actions';
@@ -18,7 +18,9 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+} from "@/components/ui/collapsible";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
+
 
 interface Flashcard {
   front: string;
@@ -255,7 +257,7 @@ export function FlashcardsTool() {
   );
 
   const WelcomeScreen = () => (
-    <div className="flex flex-col items-center justify-center h-full text-center p-8">
+    <div className="flex flex-col items-center justify-center h-full text-center p-8 hide-on-print">
       <div className="bg-primary/10 p-4 rounded-full mb-4">
         <Layers className="w-10 h-10 text-primary" />
       </div>
@@ -270,7 +272,7 @@ export function FlashcardsTool() {
   );
 
   const LoadingScreen = () => (
-    <div className="flex-grow flex flex-col items-center justify-center p-4 md:p-6">
+    <div className="flex-grow flex flex-col items-center justify-center p-4 md:p-6 hide-on-print">
        <div className="w-full max-w-md p-1">
           <Skeleton className="aspect-video w-full rounded-lg" />
        </div>
@@ -278,7 +280,7 @@ export function FlashcardsTool() {
   );
 
   const FlashcardView = ({ card, isFlipped }: { card: SessionCard, isFlipped: boolean }) => (
-    <div className="flex-grow flex flex-col items-center justify-center p-4 md:p-6">
+    <div className="flex-grow flex flex-col items-center justify-center p-4 md:p-6 hide-on-print">
        <div className="w-full max-w-md mb-4">
         <p className="text-center text-muted-foreground">Card {currentCardIndex + 1} of {sessionCards.length}</p>
         <div className="w-full bg-muted rounded-full h-2.5 mt-2">
@@ -348,13 +350,22 @@ export function FlashcardsTool() {
     const struggledCount = sessionCards.filter(card => card.timeSpent > avgTime).length;
 
     return (
-        <div className="flex-grow flex flex-col items-center justify-center p-4 md:p-6 text-center">
-            <Card className="w-full max-w-2xl">
-                <CardHeader>
+        <div className="flex-grow flex flex-col items-center p-4 md:p-6 text-center">
+            <Card className="w-full max-w-2xl printable-content">
+                <CardHeader className="relative">
                     <CardTitle className="flex items-center justify-center">
                         <BarChart className="w-8 h-8 text-primary mr-4" />
                         <h1 className="font-headline text-4xl font-bold">Session Complete!</h1>
                     </CardTitle>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-4 right-4 h-8 w-8 hide-on-print"
+                        onClick={() => window.print()}
+                      >
+                        <Printer className="h-5 w-5" />
+                        <span className="sr-only">Save as PDF</span>
+                      </Button>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="grid grid-cols-2 gap-4 text-center">
@@ -390,8 +401,24 @@ export function FlashcardsTool() {
                     </div>
                     
                     <Separator />
+
+                     <Accordion type="single" collapsible className="w-full text-left">
+                        <AccordionItem value="item-1">
+                            <AccordionTrigger>Review All Cards ({sessionCards.length})</AccordionTrigger>
+                            <AccordionContent>
+                                <div className="space-y-4 p-2 max-h-60 overflow-y-auto">
+                                    {sessionCards.map((card, index) => (
+                                        <div key={index} className="p-3 border rounded-md">
+                                            <p className="font-semibold">{card.front}</p>
+                                            <p className="text-muted-foreground">{card.back}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </AccordionContent>
+                        </AccordionItem>
+                    </Accordion>
                     
-                    <div className="flex flex-col sm:flex-row justify-center gap-4">
+                    <div className="flex flex-col sm:flex-row justify-center gap-4 hide-on-print">
                         <Button onClick={handleReviewAgain}>
                             Review All Again <ArrowRight className="ml-2" />
                         </Button>
@@ -444,7 +471,9 @@ export function FlashcardsTool() {
       <div className="flex-grow overflow-y-auto">
         {renderContent()}
       </div>
-      <InputArea onSubmit={generateFlashcards} onImport={handleImport} isLoading={isLoading} showImport={true} />
+      <div className="hide-on-print">
+        <InputArea onSubmit={generateFlashcards} onImport={handleImport} isLoading={isLoading} showImport={true} />
+      </div>
     </div>
   );
 }
