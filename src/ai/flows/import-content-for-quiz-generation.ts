@@ -29,7 +29,7 @@ export async function importContentForQuizGeneration(
     }
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'gpt-4',
       messages: [
         {
           role: 'system',
@@ -58,6 +58,6 @@ export async function importContentForQuizGeneration(
 
   } catch (error: any) {
     console.error("Error generating quiz:", error);
-    throw new Error('Failed to generate quiz.');
+    throw error;
   }
 }
