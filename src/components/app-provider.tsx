@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/client';
 import type { Session, User, SupabaseClient } from '@supabase/supabase-js';
 
 export type Tool = 'summary' | 'quiz' | 'flashcards' | 'answer';
@@ -100,30 +100,37 @@ export function AppProvider({ children, supabaseUrl, supabaseAnonKey }: AppProvi
   // Sync local data to Supabase
   const syncLocalData = async (userId: string) => {
     const localData = localStorage.getItem(LOCAL_STORAGE_KEY_SESSIONS);
-    if (localData) {
-        const localSessions: StudySession[] = JSON.parse(localData);
-        const unsyncedSessions = localSessions.filter(s => !s.isSynced);
+    if (!localData) return;
 
-        if (unsyncedSessions.length > 0) {
-            const sessionsToUpload = unsyncedSessions.map(s => ({
-                id: s.id,
-                user_id: userId,
-                type: s.type,
-                title: s.title,
-                content: s.content,
-                created_at: new Date(s.createdAt).toISOString(),
-                updated_at: new Date(s.updatedAt).toISOString(),
-                is_synced: true,
-            }));
-            
-            const { error } = await supabase.from('sessions').upsert(sessionsToUpload);
+    let localSessions: StudySession[] = JSON.parse(localData);
+    const unsyncedSessions = localSessions.filter(s => !s.isSynced);
 
-            if (error) {
-                console.error("Error syncing data:", error);
+    if (unsyncedSessions.length > 0) {
+        console.log(`Found ${unsyncedSessions.length} unsynced sessions. Uploading...`);
+        const sessionsToUpload = unsyncedSessions.map(s => ({
+            id: s.id,
+            user_id: userId,
+            type: s.type,
+            title: s.title,
+            content: s.content,
+            created_at: new Date(s.createdAt).toISOString(),
+            updated_at: new Date(s.updatedAt).toISOString(),
+        }));
+        
+        const { error } = await supabase.from('sessions').upsert(sessionsToUpload);
+
+        if (error) {
+            console.error("Error syncing data to Supabase:", error);
+            // Do not clear local data if sync fails
+        } else {
+            console.log("Successfully synced local data.");
+            // Sync was successful, so we can clear the now-synced data from local storage.
+            // We keep sessions that belong to another user or are still unsynced for some reason.
+            const remainingLocalSessions = localSessions.filter(s => s.isSynced || !unsyncedSessions.some(us => us.id === s.id));
+            if (remainingLocalSessions.length > 0) {
+                 localStorage.setItem(LOCAL_STORAGE_KEY_SESSIONS, JSON.stringify(remainingLocalSessions));
             } else {
-                // Mark all local sessions as synced
-                 const updatedLocalSessions = localSessions.map(s => ({ ...s, isSynced: true, userId: userId }));
-                 localStorage.setItem(LOCAL_STORAGE_KEY_SESSIONS, JSON.stringify(updatedLocalSessions));
+                 localStorage.removeItem(LOCAL_STORAGE_KEY_SESSIONS);
             }
         }
     }
@@ -150,7 +157,7 @@ export function AppProvider({ children, supabaseUrl, supabaseAnonKey }: AppProvi
         content: item.content,
         createdAt: new Date(item.created_at).getTime(),
         updatedAt: new Date(item.updated_at).getTime(),
-        isSynced: item.is_synced,
+        isSynced: true, // Data from Supabase is always considered synced
         userId: item.user_id,
     }));
   }
@@ -158,31 +165,20 @@ export function AppProvider({ children, supabaseUrl, supabaseAnonKey }: AppProvi
 
   // Handle auth state changes and initial load
   useEffect(() => {
-    setIsAuthLoading(true);
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
-        setSession(session);
+        setIsAuthLoading(true);
         const currentUser = session?.user ?? null;
         setUser(currentUser);
+        setSession(session);
         
         if (currentUser) {
           // User is logged in
           await syncLocalData(currentUser.id);
           const supabaseSessions = await fetchSupabaseData(currentUser.id);
           
-          // Merge with any remaining local data just in case
-          const localData = localStorage.getItem(LOCAL_STORAGE_KEY_SESSIONS);
-          const localSessions: StudySession[] = localData ? JSON.parse(localData) : [];
-          
-          const combinedSessions = [...supabaseSessions];
-          localSessions.forEach(localSession => {
-              if(!combinedSessions.find(s => s.id === localSession.id)) {
-                  combinedSessions.push(localSession);
-              }
-          });
-          combinedSessions.sort((a,b) => b.createdAt - a.createdAt);
-
-          setSessions(combinedSessions);
+          // After syncing and fetching, the Supabase data is the source of truth
+          setSessions(supabaseSessions);
         } else {
           // User is logged out, load from localStorage for guests
           const localData = localStorage.getItem(LOCAL_STORAGE_KEY_SESSIONS);
@@ -192,20 +188,24 @@ export function AppProvider({ children, supabaseUrl, supabaseAnonKey }: AppProvi
       }
     );
 
-    // Check initial session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-        setSession(session);
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
-        if (!currentUser) {
-             const localData = localStorage.getItem(LOCAL_STORAGE_KEY_SESSIONS);
-             setSessions(localData ? JSON.parse(localData) : []);
-        } else {
-            const supabaseSessions = await fetchSupabaseData(currentUser.id);
-            setSessions(supabaseSessions);
-        }
-        setIsAuthLoading(false);
-    });
+    // Initial load check
+    const checkInitialSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUser = session?.user ?? null;
+
+      if (currentUser) {
+        const supabaseSessions = await fetchSupabaseData(currentUser.id);
+        setSessions(supabaseSessions);
+      } else {
+        const localData = localStorage.getItem(LOCAL_STORAGE_KEY_SESSIONS);
+        setSessions(localData ? JSON.parse(localData) : []);
+      }
+      setUser(currentUser);
+      setSession(session);
+      setIsAuthLoading(false);
+    }
+    
+    checkInitialSession();
 
     return () => {
       subscription?.unsubscribe();
@@ -226,7 +226,7 @@ export function AppProvider({ children, supabaseUrl, supabaseAnonKey }: AppProvi
       id: crypto.randomUUID(),
       createdAt: now,
       updatedAt: now,
-      isSynced: !!user, // Synced if user is logged in
+      isSynced: false, // Start as not synced
       userId: user?.id,
     };
     
@@ -241,12 +241,13 @@ export function AppProvider({ children, supabaseUrl, supabaseAnonKey }: AppProvi
             content: newSession.content,
             created_at: new Date(newSession.createdAt).toISOString(),
             updated_at: new Date(newSession.updatedAt).toISOString(),
-            is_synced: true,
         });
         if(error) {
-            console.error("Error saving to supabase:", error);
-            // Revert isSynced flag if save fails
-            setSessions(prev => prev.map(s => s.id === newSession.id ? {...s, isSynced: false} : s));
+            console.error("Error saving session to Supabase:", error);
+            // The session remains in the state with isSynced: false, will be retried on next login.
+        } else {
+            // If save is successful, update the session in the state to be synced.
+            setSessions(prev => prev.map(s => s.id === newSession.id ? {...s, isSynced: true} : s));
         }
     }
   };
