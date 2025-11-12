@@ -6,13 +6,14 @@ import { ToolOptionsBar, type QuizOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
 import { handleGenerateQuiz } from '@/app/actions';
 import { Button } from '../ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Label } from '../ui/label';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
 import { useApp, type RecentItem } from '../app-provider';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 
 
 interface Question {
@@ -24,7 +25,7 @@ interface Question {
 
 interface Answer {
     questionIndex: number;
-    selectedAnswer: number | null;
+    selectedAnswer: number;
     isCorrect: boolean;
 }
 
@@ -183,18 +184,64 @@ export function QuizTool() {
             <Card>
                 <CardHeader>
                     <CardTitle className="text-center">Quiz Complete!</CardTitle>
+                    <CardDescription className="text-center">
+                        Here's how you did.
+                    </CardDescription>
                 </CardHeader>
-                <CardContent className="text-center space-y-6">
-                    <div className="text-6xl font-bold text-primary">{score.toFixed(0)}%</div>
-                    <p className="text-xl text-muted-foreground">
-                        You answered {correctAnswers} out of {totalQuestions} questions correctly.
-                    </p>
+                <CardContent className="space-y-6">
+                    <div className="text-center">
+                        <div className="text-6xl font-bold text-primary">{score.toFixed(0)}%</div>
+                        <p className="text-xl text-muted-foreground">
+                            You answered {correctAnswers} out of {totalQuestions} questions correctly.
+                        </p>
+                    </div>
                     
-                    <div className="flex justify-center gap-4">
+                    <Accordion type="single" collapsible className="w-full">
+                       {questions.map((q, index) => {
+                            const userAnswer = answers.find(a => a.questionIndex === index);
+                            if (!userAnswer) return null;
+                            
+                            return (
+                                <AccordionItem value={`item-${index}`} key={index}>
+                                    <AccordionTrigger>
+                                        <div className="flex items-center gap-4 w-full pr-4">
+                                            {userAnswer.isCorrect ? (
+                                                <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
+                                            ) : (
+                                                <XCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
+                                            )}
+                                            <span className="text-left flex-grow">{q.question}</span>
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="space-y-4">
+                                        {!userAnswer.isCorrect && (
+                                            <div>
+                                                <p className="font-semibold">Your Answer:</p>
+                                                <p className="text-muted-foreground pl-4 border-l-2 border-red-500 ml-2">
+                                                    {q.options[userAnswer.selectedAnswer]}
+                                                </p>
+                                            </div>
+                                        )}
+                                        <div>
+                                            <p className="font-semibold">Correct Answer:</p>
+                                            <p className="text-muted-foreground pl-4 border-l-2 border-green-500 ml-2">
+                                                {q.options[q.correctIndex]}
+                                            </p>
+                                        </div>
+                                        <div>
+                                             <p className="font-semibold">Explanation:</p>
+                                             <p className="text-muted-foreground pl-4 border-l-2 border-gray-300 ml-2">{q.explanation}</p>
+                                        </div>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            )
+                       })}
+                    </Accordion>
+                    
+                    <div className="flex justify-center gap-4 pt-4">
                         <Button onClick={handleRestartQuiz}>Take Quiz Again</Button>
                         <Button variant="outline" disabled>Retry Incorrect</Button>
                     </div>
-                    {/* Placeholder for detailed results */}
                 </CardContent>
             </Card>
         </div>
