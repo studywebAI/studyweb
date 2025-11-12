@@ -32,7 +32,6 @@ import { cn } from '@/lib/utils';
 import { AuthDialog } from './auth-dialog';
 import { SettingsDialog } from './settings-dialog';
 import { Skeleton } from './ui/skeleton';
-import { supabase } from '@/lib/supabase/client';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 
 
@@ -49,7 +48,7 @@ const toolConfig = {
 };
 
 export function AppSidebar({ activeTool, setActiveTool }: AppSidebarProps) {
-  const { sessions, user, isAuthLoading } = useApp();
+  const { sessions, user, isAuthLoading, supabase } = useApp();
   const { state } = useSidebar();
   const [isAuthDialogOpen, setAuthDialogOpen] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);

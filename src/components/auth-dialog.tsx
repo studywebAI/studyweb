@@ -14,7 +14,6 @@ import { Input } from './ui/input';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { supabase } from '@/lib/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -26,6 +25,7 @@ import {
   FormLabel,
   FormMessage,
 } from './ui/form';
+import { useApp } from './app-provider';
 
 const authSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
@@ -47,6 +47,7 @@ interface AuthDialogProps {
 }
 
 export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
+  const { supabase } = useApp();
   const [isPending, startTransition] = useTransition();
   const [authView, setAuthView] = useState<'form' | 'awaiting_verification'>('form');
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
@@ -89,7 +90,6 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
           email: data.email,
           password: data.password,
           options: {
-            // This ensures Supabase sends a code instead of a magic link
             emailRedirectTo: undefined,
           },
         });

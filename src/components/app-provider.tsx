@@ -1,8 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase/client';
-import type { Session, User } from '@supabase/supabase-js';
+import { createClient } from '@/lib/supabase/client';
+import type { Session, User, SupabaseClient } from '@supabase/supabase-js';
 
 export type Tool = 'summary' | 'quiz' | 'flashcards' | 'answer';
 
@@ -32,6 +32,7 @@ interface AppContextType {
   clearModelOverride: (tool: Tool) => void;
   apiKeys: { openai: string; google: string; };
   setApiKey: (provider: 'openai' | 'google', key: string) => void;
+  supabase: SupabaseClient;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -41,6 +42,7 @@ const LOCAL_STORAGE_KEY_SETTINGS = 'studygenius_settings';
 
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const supabase = createClient();
   const [activeTool, setActiveTool] = useState<Tool>('summary');
   const [sessions, setSessions] = useState<StudySession[]>([]);
   const [session, setSession] = useState<Session | null>(null);
@@ -259,6 +261,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     clearModelOverride: handleClearModelOverride,
     apiKeys,
     setApiKey,
+    supabase,
   };
 
   return (
