@@ -12,20 +12,35 @@ import { QuizTool } from '@/components/tools/quiz-tool';
 import { FlashcardsTool } from '@/components/tools/flashcards-tool';
 import { AnswerTool } from '@/components/tools/answer-tool';
 import { useApp } from '@/components/app-provider';
-
+import { handleGenerateSummary } from '@/app/actions';
+import { handleGenerateQuiz } from '@/app/actions';
+import { handleGenerateFlashcards } from '@/app/actions';
+import { handleGenerateAnswer } from '@/app/actions';
 
 export function AppContainer() {
   const { activeTool, setActiveTool } = useApp();
+
+  const getToolComponent = () => {
+    switch (activeTool) {
+      case 'summary':
+        return <SummaryTool />;
+      case 'quiz':
+        return <QuizTool />;
+      case 'flashcards':
+        return <FlashcardsTool />;
+      case 'answer':
+        return <AnswerTool />;
+      default:
+        return null;
+    }
+  };
 
   return (
     <SidebarProvider>
       <AppSidebar activeTool={activeTool} setActiveTool={setActiveTool} />
       <div className="flex flex-col w-full">
         <SidebarInset>
-          {activeTool === 'summary' && <SummaryTool />}
-          {activeTool === 'quiz' && <QuizTool />}
-          {activeTool === 'flashcards' && <FlashcardsTool />}
-          {activeTool === 'answer' && <AnswerTool />}
+          {getToolComponent()}
         </SidebarInset>
       </div>
       <SidebarRail />
