@@ -22,6 +22,12 @@ interface Question {
   explanation: string;
 }
 
+interface Answer {
+    questionIndex: number;
+    selectedAnswer: number | null;
+    isCorrect: boolean;
+}
+
 // Helper function to determine the provider from a model name
 function getProviderFromModel(model: string): 'openai' | 'google' {
     if (model.startsWith('gemini')) {
@@ -38,6 +44,9 @@ export function QuizTool() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
+  const [answers, setAnswers] = useState<Answer[]>([]);
+  const [showResults, setShowResults] = useState(false);
+
   const { addRecent, globalModel, modelOverrides, apiKeys } = useApp();
 
   const handleOptionsChange = (newOptions: Partial<QuizOptions>) => {
@@ -51,6 +60,8 @@ export function QuizTool() {
     setCurrentQuestionIndex(0);
     setSelectedAnswer(null);
     setIsAnswered(false);
+    setAnswers([]);
+    setShowResults(false);
     
     const model = modelOverrides.quiz || globalModel;
     const provider = getProviderFromModel(model);
@@ -91,17 +102,34 @@ export function QuizTool() {
     generateQuiz(item.content);
   };
 
-
   const handleNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
       setSelectedAnswer(null);
       setIsAnswered(false);
+    } else {
+      setShowResults(true);
     }
   };
   
   const handleAnswerSubmit = () => {
+    if (selectedAnswer === null) return;
+
+    const isCorrect = selectedAnswer === questions[currentQuestionIndex].correctIndex;
+    setAnswers([...answers, {
+        questionIndex: currentQuestionIndex,
+        selectedAnswer: selectedAnswer,
+        isCorrect: isCorrect
+    }]);
     setIsAnswered(true);
+  }
+
+  const handleRestartQuiz = () => {
+    setCurrentQuestionIndex(0);
+    setSelectedAnswer(null);
+    setIsAnswered(false);
+    setAnswers([]);
+    setShowResults(false);
   }
 
   const ErrorDisplay = ({ message }: { message: string }) => (
@@ -144,9 +172,39 @@ export function QuizTool() {
         </div>
      </div>
   );
+  
+  const ResultsScreen = () => {
+    const correctAnswers = answers.filter(a => a.isCorrect).length;
+    const totalQuestions = questions.length;
+    const score = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
+
+    return (
+        <div className="mx-auto max-w-2xl p-4 md:p-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle className="text-center">Quiz Complete!</CardTitle>
+                </CardHeader>
+                <CardContent className="text-center space-y-6">
+                    <div className="text-6xl font-bold text-primary">{score.toFixed(0)}%</div>
+                    <p className="text-xl text-muted-foreground">
+                        You answered {correctAnswers} out of {totalQuestions} questions correctly.
+                    </p>
+                    
+                    <div className="flex justify-center gap-4">
+                        <Button onClick={handleRestartQuiz}>Take Quiz Again</Button>
+                        <Button variant="outline" disabled>Retry Incorrect</Button>
+                    </div>
+                    {/* Placeholder for detailed results */}
+                </CardContent>
+            </Card>
+        </div>
+    )
+  }
 
   const QuizView = () => {
     const currentQuestion = questions[currentQuestionIndex];
+    if (!currentQuestion) return null; // Should not happen if questions.length > 0
+    
     const isCorrect = selectedAnswer === currentQuestion.correctIndex;
 
     return (
@@ -173,7 +231,8 @@ export function QuizTool() {
                     key={index}
                     className={cn(
                       "flex items-center gap-4 rounded-lg border p-4 transition-colors",
-                      "cursor-pointer hover:bg-accent",
+                      !isAnswered && "cursor-pointer hover:bg-accent",
+                      isAnswered && "cursor-default",
                       isAnswered && isCorrectOption && "border-green-500 bg-green-500/10",
                       isAnswered && isSelectedOption && !isCorrectOption && "border-red-500 bg-red-500/10"
                     )}
@@ -198,8 +257,9 @@ export function QuizTool() {
             )}
             <div className="mt-6 flex justify-end">
                 {isAnswered ? (
-                     <Button onClick={handleNextQuestion} disabled={currentQuestionIndex === questions.length - 1}>
-                        Next Question <ChevronRight className="ml-2 h-4 w-4" />
+                     <Button onClick={handleNextQuestion}>
+                        {currentQuestionIndex === questions.length - 1 ? 'Show Results' : 'Next Question'}
+                        <ChevronRight className="ml-2 h-4 w-4" />
                     </Button>
                 ) : (
                     <Button onClick={handleAnswerSubmit} disabled={selectedAnswer === null}>
@@ -219,6 +279,9 @@ export function QuizTool() {
     }
     if (error) {
       return <ErrorDisplay message={error} />;
+    }
+    if (showResults) {
+        return <ResultsScreen />;
     }
     if (questions.length > 0) {
       return <QuizView />;
