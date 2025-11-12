@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Layers, Check, X, RotateCw, BarChart, ArrowRight, Timer, Eye, BrainCircuit, HelpCircle, Bot, Loader2, Printer } from 'lucide-react';
+import { Layers, Check, X, RotateCw, BarChart, ArrowRight, Timer, Eye, BrainCircuit, HelpCircle, Bot, Loader2, Printer, Download } from 'lucide-react';
 import { ToolOptionsBar, type FlashcardOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
 import { handleGenerateFlashcards, handleGenerateAnswer } from '@/app/actions';
@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { useApp, type RecentItem } from '../app-provider';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Button } from '../ui/button';
-import { cn } from '@/lib/utils';
+import { cn, downloadFile } from '@/lib/utils';
 import { Separator } from '../ui/separator';
 import { Textarea } from '../ui/textarea';
 import { Label } from '../ui/label';
@@ -348,6 +348,15 @@ export function FlashcardsTool() {
     const mostFlippedCard = sessionCards.length > 0 ? sessionCards.reduce((max, card) => card.flips > max.flips ? card : max) : null;
     
     const struggledCount = sessionCards.filter(card => card.timeSpent > avgTime).length;
+    
+    const handleDownload = () => {
+        const dataToSave = {
+            accuracy: accuracy.toFixed(0) + '%',
+            averageTime: avgTime.toFixed(1) + 's',
+            cards: sessionCards,
+        };
+        downloadFile(JSON.stringify(dataToSave, null, 2), 'flashcard_session.json', 'application/json');
+    };
 
     return (
         <div className="flex-grow flex flex-col items-center p-4 md:p-6 text-center">
@@ -357,15 +366,26 @@ export function FlashcardsTool() {
                         <BarChart className="w-8 h-8 text-primary mr-4" />
                         <h1 className="font-headline text-4xl font-bold">Session Complete!</h1>
                     </CardTitle>
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute top-4 right-4 h-8 w-8 hide-on-print"
-                        onClick={() => window.print()}
-                      >
-                        <Printer className="h-5 w-5" />
-                        <span className="sr-only">Save as PDF</span>
-                      </Button>
+                    <div className="absolute top-4 right-4 flex items-center gap-1 hide-on-print">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={handleDownload}
+                        >
+                            <Download className="h-5 w-5" />
+                            <span className="sr-only">Download results</span>
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => window.print()}
+                        >
+                            <Printer className="h-5 w-5" />
+                            <span className="sr-only">Save as PDF</span>
+                        </Button>
+                     </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="grid grid-cols-2 gap-4 text-center">
