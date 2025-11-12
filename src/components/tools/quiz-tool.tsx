@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Lightbulb, CheckCircle2, XCircle, ChevronRight, Loader2, AlertTriangle, Printer } from 'lucide-react';
+import { Lightbulb, CheckCircle2, XCircle, ChevronRight, Loader2, AlertTriangle, Printer, Download } from 'lucide-react';
 import { ToolOptionsBar, type QuizOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
 import { handleGenerateQuiz, handleGradeAnswer } from '@/app/actions';
@@ -9,7 +9,7 @@ import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { cn } from '@/lib/utils';
+import { cn, downloadFile } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
 import { useApp, type RecentItem } from '../app-provider';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
@@ -253,6 +253,23 @@ export function QuizTool() {
     const score = totalQuestions > 0 ? ((correctAnswersCount + partiallyCorrectCount * 0.5) / totalQuestions) * 100 : 0;
     const incorrectCount = totalQuestions - correctAnswersCount - partiallyCorrectCount;
 
+    const handleDownload = () => {
+        const dataToSave = {
+            score: score.toFixed(0) + '%',
+            results: questions.map((q, index) => {
+                const userAnswer = gradedAnswers.find(a => a.questionIndex === index);
+                return {
+                    question: q.question,
+                    submittedAnswer: userAnswer?.submittedAnswer || "",
+                    correctAnswer: q.correctAnswer,
+                    grade: userAnswer?.grade || 'incorrect',
+                    explanation: userAnswer?.gradeExplanation || 'N/A'
+                };
+            })
+        };
+        downloadFile(JSON.stringify(dataToSave, null, 2), `quiz_results.json`, 'application/json');
+    };
+
     return (
         <div className="mx-auto max-w-2xl p-4 md:p-6 printable-content">
             <Card>
@@ -261,15 +278,26 @@ export function QuizTool() {
                     <CardDescription className="text-center">
                         Here's how you did.
                     </CardDescription>
-                     <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute top-4 right-4 h-8 w-8 hide-on-print"
-                        onClick={() => window.print()}
-                      >
-                        <Printer className="h-5 w-5" />
-                        <span className="sr-only">Save as PDF</span>
-                      </Button>
+                     <div className="absolute top-4 right-4 flex items-center gap-1 hide-on-print">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={handleDownload}
+                        >
+                            <Download className="h-5 w-5" />
+                            <span className="sr-only">Download results</span>
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => window.print()}
+                        >
+                            <Printer className="h-5 w-5" />
+                            <span className="sr-only">Save as PDF</span>
+                        </Button>
+                     </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="text-center">
