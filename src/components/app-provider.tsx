@@ -40,9 +40,14 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 const LOCAL_STORAGE_KEY_SESSIONS = 'studygenius_sessions';
 const LOCAL_STORAGE_KEY_SETTINGS = 'studygenius_settings';
 
+interface AppProviderProps {
+  children: React.ReactNode;
+  supabaseUrl: string;
+  supabaseAnonKey: string;
+}
 
-export function AppProvider({ children }: { children: React.ReactNode }) {
-  const supabase = createClient();
+export function AppProvider({ children, supabaseUrl, supabaseAnonKey }: AppProviderProps) {
+  const [supabase] = useState(() => createClient(supabaseUrl, supabaseAnonKey));
   const [activeTool, setActiveTool] = useState<Tool>('summary');
   const [sessions, setSessions] = useState<StudySession[]>([]);
   const [session, setSession] = useState<Session | null>(null);
@@ -205,7 +210,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription?.unsubscribe();
     };
-  }, []);
+  }, [supabase]);
 
   // Update localStorage whenever sessions change for a guest user
   useEffect(() => {
