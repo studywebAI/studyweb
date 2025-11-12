@@ -90,6 +90,64 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setApiKeys(prev => ({...prev, [provider]: key}));
   };
 
+  // Sync local data to Supabase
+  const syncLocalData = async (userId: string) => {
+    const localData = localStorage.getItem(LOCAL_STORAGE_KEY_SESSIONS);
+    if (localData) {
+        const localSessions: StudySession[] = JSON.parse(localData);
+        const unsyncedSessions = localSessions.filter(s => !s.isSynced);
+
+        if (unsyncedSessions.length > 0) {
+            const sessionsToUpload = unsyncedSessions.map(s => ({
+                id: s.id,
+                user_id: userId,
+                type: s.type,
+                title: s.title,
+                content: s.content,
+                created_at: new Date(s.createdAt).toISOString(),
+                updated_at: new Date(s.updatedAt).toISOString(),
+                is_synced: true,
+            }));
+            
+            const { error } = await supabase.from('sessions').upsert(sessionsToUpload);
+
+            if (error) {
+                console.error("Error syncing data:", error);
+            } else {
+                // Mark all local sessions as synced
+                 const updatedLocalSessions = localSessions.map(s => ({ ...s, isSynced: true, userId: userId }));
+                 localStorage.setItem(LOCAL_STORAGE_KEY_SESSIONS, JSON.stringify(updatedLocalSessions));
+            }
+        }
+    }
+  }
+
+  // Fetch data from Supabase for a logged-in user
+  const fetchSupabaseData = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('sessions')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error("Error fetching supabase data:", error);
+        return [];
+    }
+    
+    // Map from snake_case to camelCase
+    return data.map(item => ({
+        id: item.id,
+        type: item.type,
+        title: item.title,
+        content: item.content,
+        createdAt: new Date(item.created_at).getTime(),
+        updatedAt: new Date(item.updated_at).getTime(),
+        isSynced: item.is_synced,
+        userId: item.user_id,
+    }));
+  }
+
 
   // Handle auth state changes and initial load
   useEffect(() => {
@@ -97,12 +155,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         setSession(session);
-        setUser(session?.user ?? null);
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
         
-        if (session) {
-          // TODO: Fetch data from Supabase and merge with local
+        if (currentUser) {
+          // User is logged in
+          await syncLocalData(currentUser.id);
+          const supabaseSessions = await fetchSupabaseData(currentUser.id);
+          
+          // Merge with any remaining local data just in case
+          const localData = localStorage.getItem(LOCAL_STORAGE_KEY_SESSIONS);
+          const localSessions: StudySession[] = localData ? JSON.parse(localData) : [];
+          
+          const combinedSessions = [...supabaseSessions];
+          localSessions.forEach(localSession => {
+              if(!combinedSessions.find(s => s.id === localSession.id)) {
+                  combinedSessions.push(localSession);
+              }
+          });
+          combinedSessions.sort((a,b) => b.createdAt - a.createdAt);
+
+          setSessions(combinedSessions);
         } else {
-          // Load from localStorage for guests
+          // User is logged out, load from localStorage for guests
           const localData = localStorage.getItem(LOCAL_STORAGE_KEY_SESSIONS);
           setSessions(localData ? JSON.parse(localData) : []);
         }
@@ -111,12 +186,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
 
     // Check initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
         setSession(session);
-        setUser(session?.user ?? null);
-        if (!session) {
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+        if (!currentUser) {
              const localData = localStorage.getItem(LOCAL_STORAGE_KEY_SESSIONS);
              setSessions(localData ? JSON.parse(localData) : []);
+        } else {
+            const supabaseSessions = await fetchSupabaseData(currentUser.id);
+            setSessions(supabaseSessions);
         }
         setIsAuthLoading(false);
     });
@@ -133,7 +212,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [sessions, user, isAuthLoading]);
 
-  const addSession = (item: Omit<StudySession, 'id' | 'createdAt' | 'updatedAt' | 'isSynced'>) => {
+  const addSession = async (item: Omit<StudySession, 'id' | 'createdAt' | 'updatedAt' | 'isSynced'>) => {
     const now = Date.now();
     const newSession: StudySession = {
       ...item,
@@ -144,12 +223,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       userId: user?.id,
     };
     
+    setSessions(prev => [newSession, ...prev]);
+    
     if (user) {
-        // TODO: Save to supabase
-        console.log("Saving to supabase (not implemented yet)");
-        setSessions(prev => [newSession, ...prev]);
-    } else {
-        setSessions(prev => [newSession, ...prev]);
+        const { error } = await supabase.from('sessions').insert({
+            id: newSession.id,
+            user_id: user.id,
+            type: newSession.type,
+            title: newSession.title,
+            content: newSession.content,
+            created_at: new Date(newSession.createdAt).toISOString(),
+            updated_at: new Date(newSession.updatedAt).toISOString(),
+            is_synced: true,
+        });
+        if(error) {
+            console.error("Error saving to supabase:", error);
+            // Revert isSynced flag if save fails
+            setSessions(prev => prev.map(s => s.id === newSession.id ? {...s, isSynced: false} : s));
+        }
     }
   };
   

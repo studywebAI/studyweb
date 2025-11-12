@@ -9,7 +9,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -25,7 +24,6 @@ const emailSchema = z.object({
 });
 
 const otpSchema = z.object({
-  email: z.string().email(),
   token: z.string().min(6, { message: 'Token must be 6 digits.' }).max(6),
 });
 
@@ -78,6 +76,8 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
   };
 
   const handleOtpSubmit: SubmitHandler<OtpFormValues> = async (data) => {
+    if(!authEmail) return;
+
     startTransition(async () => {
         const { data: { session }, error } = await supabase.auth.verifyOtp({
             email: authEmail,
@@ -120,8 +120,8 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
           <DialogTitle>Get Started</DialogTitle>
           <DialogDescription>
             {showOtpForm 
-             ? 'Enter the 6-digit code sent to your email.'
-             : 'Sign in or create an account with a secure magic link.'}
+             ? `Enter the 6-digit code sent to ${authEmail}.`
+             : 'Sign in or create an account to save your progress.'}
           </DialogDescription>
         </DialogHeader>
         
@@ -146,8 +146,9 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                 </div>
                 <Button type="submit" className="w-full" disabled={isPending}>
                      {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Sign In
+                    Verify & Sign In
                 </Button>
+                <Button variant="link" size="sm" className="w-full" onClick={() => setShowOtpForm(false)}>Use a different email</Button>
             </form>
         )}
 
