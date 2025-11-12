@@ -3,8 +3,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ToolOptionsBar, type SummaryOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
 import { handleGenerateSummary } from '@/app/actions';
-import { Bot, User, FileText, Printer } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Bot, User, FileText, Printer, Download } from 'lucide-react';
+import { cn, downloadFile } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
 import { useApp } from '../app-provider';
 import Markdown from 'react-markdown';
@@ -48,6 +48,11 @@ export function SummaryTool() {
 
   const handleOptionsChange = (newOptions: Partial<SummaryOptions>) => {
     setOptions((prev) => ({ ...prev, ...newOptions }));
+  };
+
+  const handleDownload = (content: string) => {
+    const title = content.substring(0, 30).replace(/\s/g, '_');
+    downloadFile(content, `summary_${title}.md`, 'text/markdown');
   };
 
   const handleSubmit = async (text: string) => {
@@ -171,14 +176,24 @@ export function SummaryTool() {
                 ) : (
                   msg.role === 'ai' ? (
                     <>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={() => window.print()}
-                        >
-                            <Printer className="h-4 w-4" />
-                        </Button>
+                        <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => handleDownload(msg.content)}
+                            >
+                                <Download className="h-4 w-4" />
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => window.print()}
+                            >
+                                <Printer className="h-4 w-4" />
+                            </Button>
+                        </div>
                         <article className="prose prose-sm max-w-none dark:prose-invert printable-content">
                             <Markdown>{msg.content}</Markdown>
                         </article>
