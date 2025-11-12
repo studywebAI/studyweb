@@ -51,11 +51,12 @@ export function AnswerTool() {
       }
 
     } catch (error: any) {
+      const errorMessage = error.message || 'An unknown error occurred.';
       console.error('Error generating answer:', error);
       setMessages((prev) =>
         prev.map((msg, index) =>
           index === prev.length - 1
-            ? { ...msg, content: `Sorry, I had trouble generating an answer. ${error.message}` }
+            ? { ...msg, content: `Error: ${errorMessage}` }
             : msg
         )
       );

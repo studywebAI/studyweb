@@ -49,8 +49,9 @@ export function FlashcardsTool() {
         content: text,
       });
     } catch (e: any) {
+      const errorMessage = e.message || 'An unknown error occurred.';
       console.error('Error generating flashcards:', e);
-      setError(e.message || 'An unknown error occurred.');
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

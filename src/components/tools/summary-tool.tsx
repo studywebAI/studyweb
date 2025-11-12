@@ -92,7 +92,7 @@ export function SummaryTool() {
       setMessages((prev) =>
         prev.map((msg, index) =>
           index === prev.length - 1
-            ? { ...msg, content: `Sorry, I had trouble generating a summary. ${errorMessage}`, isStreaming: false }
+            ? { ...msg, content: `Error: ${errorMessage}`, isStreaming: false }
             : msg
         )
       );

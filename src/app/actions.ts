@@ -22,8 +22,8 @@ export async function handleGenerateSummary(input: GenerateSummaryFromTextInput)
     return await generateSummaryFromText(input);
   } catch (e: any) {
     console.error('Server action error:', e);
-    // Re-throwing the error to be caught by the client
-    throw new Error('Failed to generate summary in server action.');
+    // Re-throwing the original error to be caught by the client
+    throw e;
   }
 }
 
@@ -32,7 +32,7 @@ export async function handleGenerateQuiz(input: GenerateQuizFromSummaryInput) {
         return await generateQuizFromSummary(input);
     } catch (e: any) {
         console.error('Server action error:', e);
-        throw new Error('Failed to generate quiz in server action.');
+        throw e;
     }
 }
 
@@ -41,7 +41,7 @@ export async function handleGenerateFlashcards(input: GenerateFlashcardsFromText
         return await generateFlashcardsFromText(input);
     } catch (e: any) {
         console.error('Server action error:', e);
-        throw new Error('Failed to generate flashcards in server action.');
+        throw e;
     }
 }
 
@@ -50,6 +50,6 @@ export async function handleGenerateAnswer(input: GenerateAnswerFromTextInput) {
         return await generateAnswerFromText(input);
     } catch (e: any) {
         console.error('Server action error:', e);
-        throw new Error('Failed to generate answer in server action.');
+        throw e;
     }
 }
