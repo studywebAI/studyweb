@@ -81,6 +81,7 @@ const QuizQuestionSchema = z.object({
   explanation: z
     .string()
     .describe('The explanation for why the answer is correct.'),
+  option_explanations: z.array(z.string()).optional().describe('An array of explanations for each option.')
 });
 
 export const GenerateQuizFromSummaryOutputSchema = z.object({

@@ -29,11 +29,19 @@ export async function generateQuizFromSummary(
   input: GenerateQuizFromSummaryInput
 ): Promise<GenerateQuizFromSummaryOutput> {
   try {
-    const systemPrompt = `You are a quiz generator. Generate a quiz based on the following summary. Respond in JSON format. The response should be a JSON object with a single key "questions", which is an array of question objects. Each question object should have "question", "options" (an array of strings), "correctIndex" (a number), and "explanation" (a detailed reason why the correct answer is right) keys.
-    
-        Options:
-        - Number of Questions: ${input.options?.questionCount || 10}
-        - Difficulty: ${input.options?.difficulty || 'medium'}
+    const systemPrompt = `You are a quiz generator. Generate a quiz based on the following summary. Respond in JSON format.
+    The response should be a JSON object with a single key "questions", which is an array of question objects.
+
+    Each question object must have the following keys:
+    - "question": The quiz question.
+    - "options": An array of 4-5 strings representing the possible answers.
+    - "correctIndex": The 0-based index of the correct answer in the "options" array.
+    - "explanation": A detailed explanation for why the correct answer is right.
+    - "option_explanations": An array of strings, where each string briefly explains why the corresponding option at that index is correct or incorrect.
+
+    Options for quiz generation:
+    - Number of Questions: ${input.options?.questionCount || 10}
+    - Difficulty: ${input.options?.difficulty || 'medium'}
       `;
     const userPrompt = `Summary: ${input.summaryContent}`;
 

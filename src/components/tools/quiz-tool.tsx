@@ -21,6 +21,7 @@ interface Question {
   options: string[];
   correctIndex: number;
   explanation: string;
+  option_explanations?: string[];
 }
 
 interface Answer {
@@ -201,6 +202,10 @@ export function QuizTool() {
                             const userAnswer = answers.find(a => a.questionIndex === index);
                             if (!userAnswer) return null;
                             
+                            const incorrectOptionExplanation = (!userAnswer.isCorrect && q.option_explanations) 
+                                ? q.option_explanations[userAnswer.selectedAnswer]
+                                : null;
+
                             return (
                                 <AccordionItem value={`item-${index}`} key={index}>
                                     <AccordionTrigger>
@@ -219,6 +224,7 @@ export function QuizTool() {
                                                 <p className="font-semibold">Your Answer:</p>
                                                 <p className="text-muted-foreground pl-4 border-l-2 border-red-500 ml-2">
                                                     {q.options[userAnswer.selectedAnswer]}
+                                                    {incorrectOptionExplanation && <span className="block text-xs italic mt-1">({incorrectOptionExplanation})</span>}
                                                 </p>
                                             </div>
                                         )}
