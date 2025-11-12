@@ -45,10 +45,10 @@ export function FlashcardsTool() {
   const { addRecent, globalModel, modelOverrides, apiKeys } = useApp();
 
   useEffect(() => {
-    // Reset timer when card changes
+    // Reset timer when card changes or when starting a new session
     cardStartTime.current = Date.now();
     setIsFlipped(false);
-  }, [currentCardIndex]);
+  }, [currentCardIndex, showResults]);
 
 
   const handleOptionsChange = (newOptions: Partial<FlashcardOptions>) => {
@@ -109,17 +109,21 @@ export function FlashcardsTool() {
     setIsFlipped(!isFlipped);
     if (!isFlipped) { // Only count flips to the back
         const newCards = [...sessionCards];
-        newCards[currentCardIndex].flips += 1;
-        setSessionCards(newCards);
+        if (newCards[currentCardIndex]) {
+            newCards[currentCardIndex].flips += 1;
+            setSessionCards(newCards);
+        }
     }
   }
 
   const handleMarkAnswer = (isCorrect: boolean) => {
     const timeSpent = (Date.now() - cardStartTime.current) / 1000;
     const newCards = [...sessionCards];
-    newCards[currentCardIndex].isCorrect = isCorrect;
-    newCards[currentCardIndex].timeSpent += timeSpent;
-    setSessionCards(newCards);
+    if (newCards[currentCardIndex]) {
+        newCards[currentCardIndex].isCorrect = isCorrect;
+        newCards[currentCardIndex].timeSpent += timeSpent;
+        setSessionCards(newCards);
+    }
 
     if (currentCardIndex < sessionCards.length - 1) {
         setCurrentCardIndex(currentCardIndex + 1);
@@ -127,6 +131,20 @@ export function FlashcardsTool() {
         // Last card, show results
         setShowResults(true);
     }
+  };
+
+  const handleReviewAgain = () => {
+    setCurrentCardIndex(0);
+    setShowResults(false);
+    setIsFlipped(false);
+    // Reset session stats
+    const resetCards = sessionCards.map(card => ({
+        ...card,
+        isCorrect: null,
+        timeSpent: 0,
+        flips: 0
+    }));
+    setSessionCards(resetCards);
   };
 
   const ErrorDisplay = ({ message }: { message: string }) => (
@@ -161,7 +179,7 @@ export function FlashcardsTool() {
     </div>
   );
 
-  const FlashcardView = ({ card, isFlipped }: { card: Flashcard, isFlipped: boolean }) => (
+  const FlashcardView = ({ card, isFlipped }: { card: SessionCard, isFlipped: boolean }) => (
     <div className="flex-grow flex flex-col items-center justify-center p-4 md:p-6">
        <div className="w-full max-w-md mb-4">
         <p className="text-center text-muted-foreground">Card {currentCardIndex + 1} of {sessionCards.length}</p>
@@ -170,10 +188,12 @@ export function FlashcardsTool() {
         </div>
       </div>
       <Card className="w-full max-w-md aspect-video [perspective:1000px]">
-        <div 
+        <button
+          onClick={handleFlip}
           className={cn(
             "relative h-full w-full rounded-lg shadow-md transition-transform duration-500 [transform-style:preserve-3d]",
-            isFlipped && "[transform:rotateY(180deg)]"
+            isFlipped && "[transform:rotateY(180deg)]",
+            "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           )}
         >
           <CardContent className="absolute inset-0 flex items-center justify-center bg-card p-6 [backface-visibility:hidden]">
@@ -182,7 +202,7 @@ export function FlashcardsTool() {
           <CardContent className="absolute inset-0 flex flex-col items-center justify-center bg-card p-6 [transform:rotateY(180deg)] [backface-visibility:hidden]">
             <h3 className="text-center text-xl font-semibold">{card.back}</h3>
           </CardContent>
-        </div>
+        </button>
       </Card>
       <div className="w-full max-w-md mt-6 flex justify-center items-center gap-4">
         {isFlipped ? (
@@ -205,7 +225,6 @@ export function FlashcardsTool() {
   );
   
   const ResultsScreen = () => {
-    // Basic results, will be expanded later
     const correctCount = sessionCards.filter(c => c.isCorrect).length;
     return (
         <div className="flex-grow flex flex-col items-center justify-center p-4 md:p-6 text-center">
@@ -214,7 +233,7 @@ export function FlashcardsTool() {
             <p className="text-2xl text-muted-foreground mb-8">
                 You scored {correctCount} out of {sessionCards.length}
             </p>
-            <Button onClick={() => setShowResults(false)}>
+            <Button onClick={handleReviewAgain}>
                 Review Again <ArrowRight className="ml-2" />
             </Button>
         </div>
@@ -232,7 +251,7 @@ export function FlashcardsTool() {
     if (showResults) {
         return <ResultsScreen />;
     }
-    if (sessionCards.length > 0) {
+    if (sessionCards.length > 0 && sessionCards[currentCardIndex]) {
       return <FlashcardView card={sessionCards[currentCardIndex]} isFlipped={isFlipped} />;
     }
     return <WelcomeScreen />;
