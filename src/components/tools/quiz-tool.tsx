@@ -49,6 +49,8 @@ export function QuizTool() {
   const [isAnswered, setIsAnswered] = useState(false);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [showResults, setShowResults] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
+
 
   const { addRecent, globalModel, modelOverrides, apiKeys } = useApp();
 
@@ -67,8 +69,12 @@ export function QuizTool() {
     setError(null);
   };
   
-  const generateQuiz = async (text: string) => {
-    setIsLoading(true);
+  const generateQuiz = async (text: string, forRetry: boolean = false) => {
+    if(!forRetry) {
+        setIsLoading(true);
+    } else {
+        setIsRetrying(true);
+    }
     const model = modelOverrides.quiz || globalModel;
     const provider = getProviderFromModel(model);
     const apiKey = apiKeys[provider];
@@ -76,6 +82,7 @@ export function QuizTool() {
      if (!apiKey) {
         setError(`API key for ${provider} is not set. Please add it in Settings.`);
         setIsLoading(false);
+        setIsRetrying(false);
         return;
     }
 
@@ -92,17 +99,20 @@ export function QuizTool() {
       
       startQuiz(result.questions, text);
 
-      addRecent({
-        title: text.substring(0, 30) + '...',
-        type: 'Quiz',
-        content: text,
-      });
+      if(!forRetry) {
+        addRecent({
+          title: text.substring(0, 30) + '...',
+          type: 'Quiz',
+          content: text,
+        });
+      }
     } catch (e: any) {
       const errorMessage = e.message || 'An unknown error occurred.';
       console.error('Error generating quiz:', e);
       setError(errorMessage);
     } finally {
       setIsLoading(false);
+      setIsRetrying(false);
     }
   };
 
@@ -149,12 +159,13 @@ export function QuizTool() {
     const newPrompt = `
         The user previously answered questions on the following topics incorrectly.
         Generate a new quiz with ${incorrectQuestions.length} questions to test these specific topics again.
+        The new questions should be different from the original ones but test the same concepts.
         
         Incorrectly Answered Topics:
         ${incorrectContext}
     `;
 
-    await generateQuiz(newPrompt);
+    await generateQuiz(newPrompt, true);
   }
 
   const ErrorDisplay = ({ message }: { message: string }) => (
@@ -273,9 +284,9 @@ export function QuizTool() {
                         <Button 
                             variant="outline"
                             onClick={handleRetryIncorrect}
-                            disabled={incorrectCount === 0 || isLoading}
+                            disabled={incorrectCount === 0 || isRetrying}
                         >
-                            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {isRetrying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Retry {incorrectCount} Incorrect
                         </Button>
                     </div>
@@ -387,5 +398,3 @@ export function QuizTool() {
     </div>
   );
 }
-
-    
