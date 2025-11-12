@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Lightbulb, CheckCircle2, XCircle, ChevronRight, Loader2, Circle } from 'lucide-react';
+import { Lightbulb, CheckCircle2, XCircle, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
 import { ToolOptionsBar, type QuizOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
-import { handleGenerateQuiz } from '@/app/actions';
+import { handleGenerateQuiz, handleGradeAnswer } from '@/app/actions';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Input } from '../ui/input';
@@ -22,10 +22,14 @@ interface Question {
   explanation: string;
 }
 
+type Grade = 'correct' | 'incorrect' | 'partially_correct';
+
 interface Answer {
     questionIndex: number;
     submittedAnswer: string;
-    isCorrect: boolean; // This will be updated by AI grading later
+    isCorrect: boolean; // Maintained for simple scoring, but grade is the source of truth
+    grade: Grade;
+    gradeExplanation: string;
 }
 
 // Helper function to determine the provider from a model name
@@ -41,10 +45,11 @@ export function QuizTool() {
   const [sourceText, setSourceText] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGrading, setIsGrading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [userAnswer, setUserAnswer] = useState('');
-  const [answers, setAnswers] = useState<Answer[]>([]);
+  const [userAnswers, setUserAnswers] = useState<{[key: number]: string}>({});
+  const [gradedAnswers, setGradedAnswers] = useState<Answer[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
 
@@ -59,8 +64,8 @@ export function QuizTool() {
     setQuestions(quizQuestions);
     setSourceText(originalText);
     setCurrentQuestionIndex(0);
-    setUserAnswer('');
-    setAnswers([]);
+    setUserAnswers({});
+    setGradedAnswers([]);
     setShowResults(false);
     setError(null);
   };
@@ -116,24 +121,59 @@ export function QuizTool() {
     generateQuiz(item.content);
   };
 
+  const handleFinishQuiz = async () => {
+    setIsGrading(true);
+    setError(null);
+
+    const model = modelOverrides.quiz || globalModel;
+    const provider = getProviderFromModel(model);
+    const apiKey = apiKeys[provider];
+
+    if (!apiKey) {
+        setError(`API key for ${provider} is not set. Please add it in Settings.`);
+        setIsGrading(false);
+        return;
+    }
+    
+    try {
+        const gradePromises = questions.map((q, index) => {
+            const userAnswer = userAnswers[index] || "";
+            return handleGradeAnswer({
+                question: q.question,
+                correctAnswer: q.correctAnswer,
+                userAnswer: userAnswer,
+                model,
+                apiKey: { provider, key: apiKey }
+            });
+        });
+
+        const grades = await Promise.all(gradePromises);
+
+        const finalAnswers: Answer[] = grades.map((gradeResult, index) => ({
+            questionIndex: index,
+            submittedAnswer: userAnswers[index] || "",
+            isCorrect: gradeResult.grade === 'correct',
+            grade: gradeResult.grade,
+            gradeExplanation: gradeResult.explanation,
+        }));
+        
+        setGradedAnswers(finalAnswers);
+        setShowResults(true);
+
+    } catch (e: any) {
+        const errorMessage = e.message || 'An unknown error occurred during grading.';
+        console.error('Error grading quiz:', e);
+        setError(errorMessage);
+    } finally {
+        setIsGrading(false);
+    }
+  };
+
   const handleNextQuestion = () => {
-    // Save current answer
-    const currentQuestion = questions[currentQuestionIndex];
-    // A simple exact match for now. AI grading will replace this.
-    const isCorrect = userAnswer.trim().toLowerCase() === currentQuestion.correctAnswer.toLowerCase();
-
-    setAnswers([...answers, {
-        questionIndex: currentQuestionIndex,
-        submittedAnswer: userAnswer,
-        isCorrect: isCorrect
-    }]);
-
-    // Move to next question or show results
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(currentQuestionIndex + 1);
-      setUserAnswer('');
     } else {
-      setShowResults(true);
+      handleFinishQuiz();
     }
   };
 
@@ -142,17 +182,16 @@ export function QuizTool() {
   }
 
   const handleRetryIncorrect = async () => {
-    const incorrectQuestions = answers.filter(a => !a.isCorrect).map(a => questions[a.questionIndex]);
+    const incorrectQuestions = gradedAnswers.filter(a => a.grade !== 'correct').map(a => questions[a.questionIndex]);
     if (incorrectQuestions.length === 0) return;
 
     const incorrectContext = incorrectQuestions.map(q => `
         Question: ${q.question}
         Correct Answer: ${q.correctAnswer}
-        Explanation: ${q.explanation}
     `).join('\n');
 
     const newPrompt = `
-        The user previously answered questions on the following topics incorrectly.
+        The user previously answered questions on the following topics incorrectly or partially correctly.
         Generate a new quiz with ${incorrectQuestions.length} questions to test these specific topics again.
         The new questions should be different from the original ones but test the same concepts.
         
@@ -161,6 +200,10 @@ export function QuizTool() {
     `;
 
     await generateQuiz(newPrompt, true);
+  }
+
+  const handleAnswerChange = (index: number, value: string) => {
+    setUserAnswers(prev => ({...prev, [index]: value}));
   }
 
   const ErrorDisplay = ({ message }: { message: string }) => (
@@ -202,10 +245,12 @@ export function QuizTool() {
   );
   
   const ResultsScreen = () => {
-    const correctAnswersCount = answers.filter(a => a.isCorrect).length;
+    const correctAnswersCount = gradedAnswers.filter(a => a.grade === 'correct').length;
+    const partiallyCorrectCount = gradedAnswers.filter(a => a.grade === 'partially_correct').length;
     const totalQuestions = questions.length;
-    const score = totalQuestions > 0 ? (correctAnswersCount / totalQuestions) * 100 : 0;
-    const incorrectCount = totalQuestions - correctAnswersCount;
+    // Award half point for partially correct
+    const score = totalQuestions > 0 ? ((correctAnswersCount + partiallyCorrectCount * 0.5) / totalQuestions) * 100 : 0;
+    const incorrectCount = totalQuestions - correctAnswersCount - partiallyCorrectCount;
 
     return (
         <div className="mx-auto max-w-2xl p-4 md:p-6">
@@ -219,47 +264,59 @@ export function QuizTool() {
                 <CardContent className="space-y-6">
                     <div className="text-center">
                         <div className="text-6xl font-bold text-primary">{score.toFixed(0)}%</div>
-                        <p className="text-xl text-muted-foreground">
-                            You answered {correctAnswersCount} out of {totalQuestions} questions correctly.
+                        <p className="text-lg text-muted-foreground">
+                            {correctAnswersCount} correct, {partiallyCorrectCount} partially correct, {incorrectCount} incorrect.
                         </p>
                     </div>
                     
                     <Accordion type="single" collapsible className="w-full">
                        {questions.map((q, index) => {
-                            const userAnswer = answers.find(a => a.questionIndex === index);
+                            const userAnswer = gradedAnswers.find(a => a.questionIndex === index);
                             if (!userAnswer) return null;
+                            
+                            const getIcon = () => {
+                                switch(userAnswer.grade) {
+                                    case 'correct': return <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />;
+                                    case 'partially_correct': return <AlertTriangle className="h-5 w-5 text-yellow-500 flex-shrink-0" />;
+                                    case 'incorrect': return <XCircle className="h-5 w-5 text-red-500 flex-shrink-0" />;
+                                }
+                            }
                             
                             return (
                                 <AccordionItem value={`item-${index}`} key={index}>
                                     <AccordionTrigger>
                                         <div className="flex items-center gap-4 w-full pr-4">
-                                            {userAnswer.isCorrect ? (
-                                                <CheckCircle2 className="h-5 w-5 text-green-500 flex-shrink-0" />
-                                            ) : (
-                                                <XCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
-                                            )}
+                                            {getIcon()}
                                             <span className="text-left flex-grow">{q.question}</span>
                                         </div>
                                     </AccordionTrigger>
                                     <AccordionContent className="space-y-4">
-                                        {!userAnswer.isCorrect && (
+                                        <div>
+                                            <p className="font-semibold">Your Answer:</p>
+                                            <p className={cn("text-muted-foreground pl-4 border-l-2 ml-2", {
+                                                'border-green-500': userAnswer.grade === 'correct',
+                                                'border-yellow-500': userAnswer.grade === 'partially_correct',
+                                                'border-red-500': userAnswer.grade === 'incorrect',
+                                            })}>
+                                               {userAnswer.submittedAnswer || <em>(No answer submitted)</em>}
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <p className="font-semibold">Grading Explanation:</p>
+                                            <p className="text-muted-foreground pl-4 border-l-2 border-gray-300 ml-2">
+                                                {userAnswer.gradeExplanation}
+                                            </p>
+                                        </div>
+
+                                        {userAnswer.grade !== 'correct' && (
                                             <div>
-                                                <p className="font-semibold">Your Answer:</p>
-                                                <p className="text-muted-foreground pl-4 border-l-2 border-red-500 ml-2">
-                                                   {userAnswer.submittedAnswer}
+                                                <p className="font-semibold">Ideal Answer:</p>
+                                                <p className="text-muted-foreground pl-4 border-l-2 border-blue-500 ml-2">
+                                                    {q.correctAnswer}
                                                 </p>
                                             </div>
                                         )}
-                                        <div>
-                                            <p className="font-semibold">Correct Answer:</p>
-                                            <p className="text-muted-foreground pl-4 border-l-2 border-green-500 ml-2">
-                                                {q.correctAnswer}
-                                            </p>
-                                        </div>
-                                        <div>
-                                             <p className="font-semibold">Explanation:</p>
-                                             <p className="text-muted-foreground pl-4 border-l-2 border-gray-300 ml-2">{q.explanation}</p>
-                                        </div>
                                     </AccordionContent>
                                 </AccordionItem>
                             )
@@ -271,10 +328,10 @@ export function QuizTool() {
                         <Button 
                             variant="outline"
                             onClick={handleRetryIncorrect}
-                            disabled={incorrectCount === 0 || isRetrying}
+                            disabled={incorrectCount + partiallyCorrectCount === 0 || isRetrying}
                         >
                             {isRetrying && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Retry {incorrectCount} Incorrect
+                            Retry {incorrectCount + partiallyCorrectCount} Incorrect
                         </Button>
                     </div>
                 </CardContent>
@@ -298,14 +355,14 @@ export function QuizTool() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-                <Label htmlFor="answer-input">Your Answer</Label>
+                <Label htmlFor={`answer-input-${currentQuestionIndex}`}>Your Answer</Label>
                 <Input
-                    id="answer-input"
-                    value={userAnswer}
-                    onChange={(e) => setUserAnswer(e.target.value)}
+                    id={`answer-input-${currentQuestionIndex}`}
+                    value={userAnswers[currentQuestionIndex] || ''}
+                    onChange={(e) => handleAnswerChange(currentQuestionIndex, e.target.value)}
                     placeholder="Type your answer here..."
                     onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
+                        if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault();
                             handleNextQuestion();
                         }
@@ -314,8 +371,8 @@ export function QuizTool() {
             </div>
             
             <div className="mt-6 flex justify-end">
-                <Button onClick={handleNextQuestion} disabled={!userAnswer.trim()}>
-                    {currentQuestionIndex === questions.length - 1 ? 'Finish Quiz' : 'Next Question'}
+                <Button onClick={handleNextQuestion} disabled={!userAnswers[currentQuestionIndex]?.trim()}>
+                    {currentQuestionIndex === questions.length - 1 ? 'Finish & Grade Quiz' : 'Next Question'}
                     <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
             </div>
@@ -328,6 +385,15 @@ export function QuizTool() {
   const renderContent = () => {
      if (isLoading) {
       return <LoadingScreen />;
+    }
+    if (isGrading) {
+        return (
+            <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+                <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+                <h2 className="text-2xl font-semibold">Grading your answers...</h2>
+                <p className="text-muted-foreground">Please wait while the AI evaluates your responses.</p>
+            </div>
+        )
     }
     if (error) {
       return <ErrorDisplay message={error} />;

@@ -16,6 +16,10 @@ import {
   generateAnswerFromText,
   type GenerateAnswerFromTextInput,
 } from '@/ai/flows/generate-answer-from-text';
+import {
+    gradeAnswer,
+    type GradeAnswerInput,
+} from '@/ai/flows/grade-answer';
 
 export async function handleGenerateSummary(input: GenerateSummaryFromTextInput) {
   try {
@@ -49,6 +53,15 @@ export async function handleGenerateAnswer(input: GenerateAnswerFromTextInput) {
     try {
         return await generateAnswerFromText(input);
     } catch (e: any) {
+        console.error('Server action error:', e);
+        throw e;
+    }
+}
+
+export async function handleGradeAnswer(input: GradeAnswerInput) {
+    try {
+        return await gradeAnswer(input);
+    } catch (e: any)        {
         console.error('Server action error:', e);
         throw e;
     }

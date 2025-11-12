@@ -119,3 +119,16 @@ export const ImportContentForQuizGenerationOutputSchema = z.object({
     })
   ),
 });
+
+export const GradeAnswerInputSchema = z.object({
+  question: z.string().describe("The original question that was asked."),
+  correctAnswer: z.string().describe("The ideal, correct answer for the question."),
+  userAnswer: z.string().describe("The user's submitted answer."),
+  model: z.string().describe('The AI model to use for generation.'),
+  apiKey: ApiKeySchema.optional(),
+});
+
+export const GradeAnswerOutputSchema = z.object({
+    grade: z.enum(['correct', 'incorrect', 'partially_correct']).describe("The grade for the user's answer. 'partially_correct' can be used for answers that are close but not perfect."),
+    explanation: z.string().describe("A brief explanation for why the answer was given this grade. If incorrect, explain why."),
+});
