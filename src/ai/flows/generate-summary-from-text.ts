@@ -53,6 +53,6 @@ export async function generateSummaryFromText(
 
   } catch (error: any) {
     console.error("Error generating summary:", error);
-    throw new Error('Failed to generate summary.');
+    throw error;
   }
 }

@@ -54,6 +54,6 @@ export async function generateAnswerFromText(
     return parsed;
   } catch (error: any) {
     console.error("Error generating answer:", error);
-    throw new Error('Failed to generate answer.');
+    throw error;
   }
 }

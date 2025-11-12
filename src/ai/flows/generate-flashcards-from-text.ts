@@ -59,6 +59,6 @@ export async function generateFlashcardsFromText(
 
   } catch (error: any) {
     console.error("Error generating flashcards:", error);
-    throw new Error('Failed to generate flashcards.');
+    throw error;
   }
 }

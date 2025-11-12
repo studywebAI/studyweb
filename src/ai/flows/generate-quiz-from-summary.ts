@@ -62,6 +62,6 @@ export async function generateQuizFromSummary(
 
   } catch (error: any) {
     console.error("Error generating quiz:", error);
-    throw new Error('Failed to generate quiz.');
+    throw error;
   }
 }
