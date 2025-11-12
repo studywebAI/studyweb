@@ -35,6 +35,7 @@ function getProviderFromModel(model: string): 'openai' | 'google' {
 
 export function FlashcardsTool() {
   const [options, setOptions] = useState<FlashcardOptions>({ cardCount: 20 });
+  const [allCards, setAllCards] = useState<SessionCard[]>([]);
   const [sessionCards, setSessionCards] = useState<SessionCard[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,15 +56,27 @@ export function FlashcardsTool() {
   const handleOptionsChange = (newOptions: Partial<FlashcardOptions>) => {
     setOptions((prev) => ({ ...prev, ...newOptions }));
   };
-
-  const generateFlashcards = async (text: string) => {
-    setIsLoading(true);
-    setSessionCards([]);
-    setError(null);
-    setSourceText(text);
+  
+  const startNewSession = (cards: SessionCard[]) => {
+    const resetCards = cards.map(card => ({
+        ...card,
+        isCorrect: null,
+        timeSpent: 0,
+        flips: 0
+    }));
+    setSessionCards(resetCards);
     setCurrentCardIndex(0);
     setShowResults(false);
     setIsFlipped(false);
+  }
+
+  const generateFlashcards = async (text: string) => {
+    setIsLoading(true);
+    setAllCards([]);
+    setSessionCards([]);
+    setError(null);
+    setSourceText(text);
+    setShowResults(false);
 
     const model = modelOverrides.flashcards || globalModel;
     const provider = getProviderFromModel(model);
@@ -87,7 +100,8 @@ export function FlashcardsTool() {
           timeSpent: 0,
           flips: 0
       }));
-      setSessionCards(newSessionCards);
+      setAllCards(newSessionCards);
+      startNewSession(newSessionCards);
       addRecent({
         title: text.substring(0, 30) + '...',
         type: 'Flashcards',
@@ -119,33 +133,31 @@ export function FlashcardsTool() {
 
   const handleMarkAnswer = (isCorrect: boolean) => {
     const timeSpent = (Date.now() - cardStartTime.current) / 1000;
-    const newCards = [...sessionCards];
-    if (newCards[currentCardIndex]) {
-        newCards[currentCardIndex].isCorrect = isCorrect;
-        newCards[currentCardIndex].timeSpent += timeSpent;
-        setSessionCards(newCards);
-    }
+    
+    // Use a functional update to ensure we have the latest state
+    setSessionCards(prevCards => {
+        const newCards = [...prevCards];
+        if (newCards[currentCardIndex]) {
+            newCards[currentCardIndex].isCorrect = isCorrect;
+            newCards[currentCardIndex].timeSpent += timeSpent;
+        }
+        return newCards;
+    });
 
     if (currentCardIndex < sessionCards.length - 1) {
         setCurrentCardIndex(currentCardIndex + 1);
     } else {
-        // Last card, show results
         setShowResults(true);
     }
   };
 
   const handleReviewAgain = () => {
-    setCurrentCardIndex(0);
-    setShowResults(false);
-    setIsFlipped(false);
-    // Reset session stats
-    const resetCards = sessionCards.map(card => ({
-        ...card,
-        isCorrect: null,
-        timeSpent: 0,
-        flips: 0
-    }));
-    setSessionCards(resetCards);
+    startNewSession(allCards);
+  };
+
+  const handleRetryIncorrect = () => {
+    const incorrectCards = sessionCards.filter(card => card.isCorrect === false);
+    startNewSession(incorrectCards);
   };
 
   const ErrorDisplay = ({ message }: { message: string }) => (
@@ -197,12 +209,12 @@ export function FlashcardsTool() {
             "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
           )}
         >
-          <CardContent className="absolute inset-0 flex items-center justify-center bg-card p-6 [backface-visibility:hidden]">
+          <div className="absolute inset-0 flex items-center justify-center bg-card p-6 [backface-visibility:hidden]">
             <h2 className="text-center font-bold text-2xl">{card.front}</h2>
-          </CardContent>
-          <CardContent className="absolute inset-0 flex flex-col items-center justify-center bg-card p-6 [transform:rotateY(180deg)] [backface-visibility:hidden]">
+          </div>
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-card p-6 [transform:rotateY(180deg)] [backface-visibility:hidden]">
             <h3 className="text-center text-xl font-semibold">{card.back}</h3>
-          </CardContent>
+          </div>
         </button>
       </Card>
       <div className="w-full max-w-md mt-6 flex justify-center items-center gap-4">
@@ -227,6 +239,7 @@ export function FlashcardsTool() {
   
   const ResultsScreen = () => {
     const correctCount = sessionCards.filter(c => c.isCorrect).length;
+    const incorrectCount = sessionCards.filter(c => c.isCorrect === false).length;
     const accuracy = sessionCards.length > 0 ? (correctCount / sessionCards.length) * 100 : 0;
     
     const totalTime = sessionCards.reduce((acc, card) => acc + card.timeSpent, 0);
@@ -282,7 +295,14 @@ export function FlashcardsTool() {
                     
                     <div className="flex justify-center gap-4">
                         <Button onClick={handleReviewAgain}>
-                            Review Again <ArrowRight className="ml-2" />
+                            Review All Again <ArrowRight className="ml-2" />
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={handleRetryIncorrect}
+                            disabled={incorrectCount === 0}
+                        >
+                            Retry {incorrectCount} Incorrect <ArrowRight className="ml-2" />
                         </Button>
                     </div>
 
