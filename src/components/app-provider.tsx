@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from '@supabase/supabase-js';
 import type { Session, User, SupabaseClient } from '@supabase/supabase-js';
 
 export type Tool = 'summary' | 'quiz' | 'flashcards' | 'answer';
