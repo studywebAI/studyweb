@@ -102,8 +102,8 @@ export async function callGenerativeAI<T extends z.ZodType<any, any>>(
   // Otherwise, use the server's environment keys with the retry/rotation logic.
   console.log(`Using server-provided API keys for ${provider} with rotation.`);
   const envKeys = provider === 'openai' 
-    ? [process.env.OPENAI_API_KEY_1, process.env.OPENAI_API_KEY_2]
-    : [process.env.GEMINI_API_KEY_1, process.env.GEMINI_API_KEY_2];
+    ? [process.env.OPENAI_API_KEY_1, process.env.OPENAI_API_KEY]
+    : [process.env.GEMINI_API_KEY_1, process.env.GEMINI_API_KEY];
 
   const availableKeys = envKeys.filter(Boolean);
 

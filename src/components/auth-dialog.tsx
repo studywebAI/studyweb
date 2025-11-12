@@ -89,9 +89,6 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
         const { error } = await supabase.auth.signUp({
           email: data.email,
           password: data.password,
-          options: {
-            emailRedirectTo: undefined,
-          },
         });
 
         if (error) {
