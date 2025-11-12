@@ -73,15 +73,11 @@ export const GenerateQuizFromSummaryInputSchema = z.object({
 });
 
 const QuizQuestionSchema = z.object({
-  question: z.string().describe('The quiz question.'),
-  options: z.array(z.string()).describe('The possible answers to the question.'),
-  correctIndex: z
-    .number()
-    .describe('The index of the correct answer in the options array.'),
+  question: z.string().describe('The quiz question (can be fill-in-the-blank or short answer).'),
+  correctAnswer: z.string().describe('The ideal correct answer.'),
   explanation: z
     .string()
     .describe('The explanation for why the answer is correct.'),
-  option_explanations: z.array(z.string()).optional().describe('An array of explanations for each option.')
 });
 
 export const GenerateQuizFromSummaryOutputSchema = z.object({
