@@ -1,16 +1,17 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Layers, Check, X, RotateCw, BarChart, ArrowRight } from 'lucide-react';
+import { Layers, Check, X, RotateCw, BarChart, ArrowRight, Timer, Eye } from 'lucide-react';
 import { ToolOptionsBar, type FlashcardOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
 import { handleGenerateFlashcards } from '@/app/actions';
 import { Skeleton } from '../ui/skeleton';
-import { Card, CardContent } from '../ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { useApp, type RecentItem } from '../app-provider';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Button } from '../ui/button';
 import { cn } from '@/lib/utils';
+import { Separator } from '../ui/separator';
 
 interface Flashcard {
   front: string;
@@ -226,16 +227,67 @@ export function FlashcardsTool() {
   
   const ResultsScreen = () => {
     const correctCount = sessionCards.filter(c => c.isCorrect).length;
+    const accuracy = sessionCards.length > 0 ? (correctCount / sessionCards.length) * 100 : 0;
+    
+    const totalTime = sessionCards.reduce((acc, card) => acc + card.timeSpent, 0);
+    const avgTime = sessionCards.length > 0 ? totalTime / sessionCards.length : 0;
+
+    const longestCard = sessionCards.length > 0 ? sessionCards.reduce((max, card) => card.timeSpent > max.timeSpent ? card : max) : null;
+    const mostFlippedCard = sessionCards.length > 0 ? sessionCards.reduce((max, card) => card.flips > max.flips ? card : max) : null;
+
+
     return (
         <div className="flex-grow flex flex-col items-center justify-center p-4 md:p-6 text-center">
-            <BarChart className="w-16 h-16 text-primary mb-4" />
-            <h1 className="font-headline text-4xl font-bold mb-2">Session Complete!</h1>
-            <p className="text-2xl text-muted-foreground mb-8">
-                You scored {correctCount} out of {sessionCards.length}
-            </p>
-            <Button onClick={handleReviewAgain}>
-                Review Again <ArrowRight className="ml-2" />
-            </Button>
+            <Card className="w-full max-w-2xl">
+                <CardHeader>
+                    <CardTitle className="flex items-center justify-center">
+                        <BarChart className="w-8 h-8 text-primary mr-4" />
+                        <h1 className="font-headline text-4xl font-bold">Session Complete!</h1>
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="grid grid-cols-2 gap-4 text-center">
+                        <div className="rounded-lg bg-primary/10 p-4">
+                            <p className="text-sm font-medium text-muted-foreground">Accuracy</p>
+                            <p className="text-3xl font-bold">{accuracy.toFixed(0)}%</p>
+                            <p className="text-xs text-muted-foreground">({correctCount}/{sessionCards.length} correct)</p>
+                        </div>
+                        <div className="rounded-lg bg-primary/10 p-4">
+                            <p className="text-sm font-medium text-muted-foreground">Avg. Time</p>
+                            <p className="text-3xl font-bold">{avgTime.toFixed(1)}s</p>
+                             <p className="text-xs text-muted-foreground">per card</p>
+                        </div>
+                    </div>
+                    
+                    <Separator />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
+                        {longestCard && (
+                             <div className="rounded-lg border p-4">
+                                <h3 className="font-semibold flex items-center mb-2"><Timer className="mr-2 h-4 w-4"/>Longest Card</h3>
+                                <p className="text-sm font-medium truncate">"{longestCard.front}"</p>
+                                <p className="text-xs text-muted-foreground">{longestCard.timeSpent.toFixed(1)} seconds</p>
+                            </div>
+                        )}
+                        {mostFlippedCard && mostFlippedCard.flips > 0 && (
+                            <div className="rounded-lg border p-4">
+                                <h3 className="font-semibold flex items-center mb-2"><Eye className="mr-2 h-4 w-4"/>Most Flipped Card</h3>
+                                <p className="text-sm font-medium truncate">"{mostFlippedCard.front}"</p>
+                                <p className="text-xs text-muted-foreground">{mostFlippedCard.flips} flips</p>
+                            </div>
+                        )}
+                    </div>
+                    
+                    <Separator />
+                    
+                    <div className="flex justify-center gap-4">
+                        <Button onClick={handleReviewAgain}>
+                            Review Again <ArrowRight className="ml-2" />
+                        </Button>
+                    </div>
+
+                </CardContent>
+            </Card>
         </div>
     );
   }
