@@ -11,7 +11,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Label } from './ui/label';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -33,7 +32,14 @@ const authSchema = z.object({
   password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
 });
 
+const codeSchema = z.object({
+  code: z.string().min(6, { message: 'Code must be 6 digits.' }).max(6),
+});
+
+
 type AuthFormValues = z.infer<typeof authSchema>;
+type CodeFormValues = z.infer<typeof codeSchema>;
+
 
 interface AuthDialogProps {
   open: boolean;
@@ -42,18 +48,22 @@ interface AuthDialogProps {
 
 export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
   const [isPending, startTransition] = useTransition();
+  const [authView, setAuthView] = useState<'form' | 'awaiting_verification'>('form');
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [verificationEmail, setVerificationEmail] = useState('');
   const { toast } = useToast();
 
-  const form = useForm<AuthFormValues>({
+  const authForm = useForm<AuthFormValues>({
     resolver: zodResolver(authSchema),
-    defaultValues: {
-      email: '',
-      password: '',
-    },
+    defaultValues: { email: '', password: '' },
   });
 
-  const handleSubmit: SubmitHandler<AuthFormValues> = async (data) => {
+  const codeForm = useForm<CodeFormValues>({
+    resolver: zodResolver(codeSchema),
+    defaultValues: { code: '' },
+  });
+
+  const handleAuthSubmit: SubmitHandler<AuthFormValues> = async (data) => {
     startTransition(async () => {
       if (authMode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({
@@ -73,12 +83,15 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
             description: 'You are now logged in.',
           });
           onOpenChange(false);
-          // The onAuthStateChange listener in AppProvider will handle the rest
         }
       } else { // Sign Up
-        const { data: { user }, error } = await supabase.auth.signUp({
+        const { error } = await supabase.auth.signUp({
           email: data.email,
           password: data.password,
+          options: {
+            // This ensures Supabase sends a code instead of a magic link
+            emailRedirectTo: undefined,
+          },
         });
 
         if (error) {
@@ -87,34 +100,56 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
             description: error.message,
             variant: 'destructive',
           });
-        } else if (user && !user.email_confirmed_at) {
-          toast({
-            title: 'Account Created!',
-            description: 'Please check your email to confirm your account before logging in.',
-          });
-          // Stay on signup form but show success
         } else {
             toast({
-                title: 'Account Created & Confirmed!',
-                description: "You're ready to log in.",
+              title: 'Account Created!',
+              description: 'Please check your email for a 6-digit verification code.',
             });
-            setAuthMode('login'); // Switch to login tab
+            setVerificationEmail(data.email);
+            setAuthView('awaiting_verification');
         }
       }
     });
   };
 
+  const handleCodeSubmit: SubmitHandler<CodeFormValues> = async (data) => {
+     startTransition(async () => {
+        const { error } = await supabase.auth.verifyOtp({
+            email: verificationEmail,
+            token: data.code,
+            type: 'signup',
+        });
+        
+        if (error) {
+             toast({
+                title: 'Verification Failed',
+                description: error.message,
+                variant: 'destructive',
+            });
+        } else {
+            // After successful verification, the user is also logged in
+            toast({
+                title: 'Email Verified!',
+                description: "You're now logged in.",
+            });
+            onOpenChange(false);
+        }
+     });
+  }
+
   const handleDialogChange = (isOpen: boolean) => {
     if (!isOpen) {
-      form.reset();
+      authForm.reset();
+      codeForm.reset();
+      setAuthView('form');
+      setVerificationEmail('');
     }
     onOpenChange(isOpen);
   };
-
-  return (
-    <Dialog open={open} onOpenChange={handleDialogChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+  
+  const AuthForms = () => (
+    <>
+       <DialogHeader>
           <DialogTitle>Get Started</DialogTitle>
           <DialogDescription>
             {authMode === 'login' 
@@ -122,93 +157,130 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                 : 'Create an account to save your progress.'}
           </DialogDescription>
         </DialogHeader>
-
         <Tabs
-          value={authMode}
-          onValueChange={(value) => setAuthMode(value as 'login' | 'signup')}
-          className="w-full"
+            value={authMode}
+            onValueChange={(value) => setAuthMode(value as 'login' | 'signup')}
+            className="w-full"
         >
-          <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="login">Login</TabsTrigger>
             <TabsTrigger value="signup">Sign Up</TabsTrigger>
-          </TabsList>
-          <TabsContent value="login">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 pt-4">
+            </TabsList>
+            <TabsContent value="login">
+            <Form {...authForm}>
+                <form onSubmit={authForm.handleSubmit(handleAuthSubmit)} className="space-y-4 pt-4">
                 <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
+                    control={authForm.control}
+                    name="email"
+                    render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email Address</FormLabel>
-                      <FormControl>
+                        <FormLabel>Email Address</FormLabel>
+                        <FormControl>
                         <Input placeholder="you@example.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
+                        </FormControl>
+                        <FormMessage />
                     </FormItem>
-                  )}
+                    )}
                 />
                 <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
+                    control={authForm.control}
+                    name="password"
+                    render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
                         <Input type="password" placeholder="••••••••" {...field} />
-                      </FormControl>
-                      <FormMessage />
+                        </FormControl>
+                        <FormMessage />
                     </FormItem>
-                  )}
+                    )}
                 />
                 <Button type="submit" className="w-full" disabled={isPending}>
-                  {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Login
+                    {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Login
                 </Button>
-              </form>
+                </form>
             </Form>
-          </TabsContent>
-          <TabsContent value="signup">
-             <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 pt-4">
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email Address</FormLabel>
-                      <FormControl>
-                        <Input placeholder="you@example.com" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" className="w-full" disabled={isPending}>
-                  {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Create Account
-                </Button>
-              </form>
-            </Form>
-          </TabsContent>
+            </TabsContent>
+            <TabsContent value="signup">
+                <Form {...authForm}>
+                <form onSubmit={authForm.handleSubmit(handleAuthSubmit)} className="space-y-4 pt-4">
+                    <FormField
+                    control={authForm.control}
+                    name="email"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Email Address</FormLabel>
+                        <FormControl>
+                            <Input placeholder="you@example.com" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <FormField
+                    control={authForm.control}
+                    name="password"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                            <Input type="password" placeholder="••••••••" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <Button type="submit" className="w-full" disabled={isPending}>
+                    {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Create Account
+                    </Button>
+                </form>
+                </Form>
+            </TabsContent>
         </Tabs>
-
         <DialogFooter className="pt-4 text-xs text-muted-foreground text-center">
           By continuing, you agree to our Terms of Service.
         </DialogFooter>
+    </>
+  );
+
+  const VerificationForm = () => (
+    <>
+         <DialogHeader>
+          <DialogTitle>Check your email</DialogTitle>
+          <DialogDescription>
+            We've sent a 6-digit code to <span className="font-medium text-foreground">{verificationEmail}</span>. Enter it below to verify your email.
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...codeForm}>
+              <form onSubmit={codeForm.handleSubmit(handleCodeSubmit)} className="space-y-4 pt-4">
+                <FormField
+                  control={codeForm.control}
+                  name="code"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Verification Code</FormLabel>
+                      <FormControl>
+                        <Input placeholder="123456" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" className="w-full" disabled={isPending}>
+                  {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Verify and Login
+                </Button>
+              </form>
+        </Form>
+    </>
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={handleDialogChange}>
+      <DialogContent className="sm:max-w-md">
+        {authView === 'form' ? <AuthForms /> : <VerificationForm />}
       </DialogContent>
     </Dialog>
   );
