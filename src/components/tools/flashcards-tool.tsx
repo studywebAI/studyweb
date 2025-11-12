@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Layers, Check, X, RotateCw, BarChart, ArrowRight, Timer, Eye } from 'lucide-react';
+import { Layers, Check, X, RotateCw, BarChart, ArrowRight, Timer, Eye, BrainCircuit } from 'lucide-react';
 import { ToolOptionsBar, type FlashcardOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
 import { handleGenerateFlashcards } from '@/app/actions';
@@ -160,6 +160,11 @@ export function FlashcardsTool() {
     startNewSession(incorrectCards);
   };
 
+  const handleRetryStruggled = (avgTime: number) => {
+    const struggledCards = sessionCards.filter(card => card.timeSpent > avgTime);
+    startNewSession(struggledCards);
+  };
+
   const ErrorDisplay = ({ message }: { message: string }) => (
     <div className="flex flex-col items-center justify-center h-full p-8">
       <Alert variant="destructive" className="max-w-lg">
@@ -247,7 +252,8 @@ export function FlashcardsTool() {
 
     const longestCard = sessionCards.length > 0 ? sessionCards.reduce((max, card) => card.timeSpent > max.timeSpent ? card : max) : null;
     const mostFlippedCard = sessionCards.length > 0 ? sessionCards.reduce((max, card) => card.flips > max.flips ? card : max) : null;
-
+    
+    const struggledCount = sessionCards.filter(card => card.timeSpent > avgTime).length;
 
     return (
         <div className="flex-grow flex flex-col items-center justify-center p-4 md:p-6 text-center">
@@ -293,7 +299,7 @@ export function FlashcardsTool() {
                     
                     <Separator />
                     
-                    <div className="flex justify-center gap-4">
+                    <div className="flex flex-col sm:flex-row justify-center gap-4">
                         <Button onClick={handleReviewAgain}>
                             Review All Again <ArrowRight className="ml-2" />
                         </Button>
@@ -302,7 +308,14 @@ export function FlashcardsTool() {
                             onClick={handleRetryIncorrect}
                             disabled={incorrectCount === 0}
                         >
-                            Retry {incorrectCount} Incorrect <ArrowRight className="ml-2" />
+                            Retry {incorrectCount} Incorrect <X className="ml-2" />
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={() => handleRetryStruggled(avgTime)}
+                            disabled={struggledCount === 0}
+                        >
+                           Retry {struggledCount} Struggled <BrainCircuit className="ml-2" />
                         </Button>
                     </div>
 
