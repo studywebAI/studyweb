@@ -1,9 +1,10 @@
 /**
  * @fileOverview This file provides a unified handler for making calls to different generative AI providers.
  * It abstracts the specific SDKs (OpenAI, Google GenAI) into a single function.
+ * It also includes a retry mechanism for API key rotation.
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, GoogleGenerativeAIError } from '@google/generative-ai';
 import OpenAI from 'openai';
 import { z } from 'zod';
 
@@ -24,7 +25,6 @@ function getProviderFromModel(model: string): 'openai' | 'google' {
   return 'openai';
 }
 
-
 interface CallGenerativeAIParams<T extends z.ZodType<any, any>> {
   model: string;
   apiKey?: { provider: 'openai' | 'google', key: string };
@@ -33,6 +33,59 @@ interface CallGenerativeAIParams<T extends z.ZodType<any, any>> {
   schema: T;
 }
 
+// Function to call the underlying AI service. This will be wrapped with retry logic.
+async function callAI<T extends z.ZodType<any, any>>(
+    provider: 'openai' | 'google',
+    apiKey: string,
+    model: string,
+    systemPrompt: string,
+    userPrompt: string,
+    schema: T
+): Promise<z.infer<T>> {
+    if (provider === 'openai') {
+        return callOpenAI(apiKey, model, systemPrompt, userPrompt, schema);
+    } else if (provider === 'google') {
+        return callGoogleAI(apiKey, model, systemPrompt, userPrompt, schema);
+    }
+    throw new Error(`Unsupported model provider for model: ${model}`);
+}
+
+
+// A wrapper to handle retries with a fallback key.
+async function callWithRetry<T extends z.ZodType<any, any>>(
+    provider: 'openai' | 'google',
+    keys: (string | undefined)[],
+    model: string,
+    systemPrompt: string,
+    userPrompt: string,
+    schema: T
+): Promise<z.infer<T>> {
+    let lastError: any = new Error(`No API keys provided for ${provider}.`);
+    
+    for (const key of keys) {
+        if (!key) continue;
+        
+        try {
+            return await callAI(provider, key, model, systemPrompt, userPrompt, schema);
+        } catch (error: any) {
+            console.warn(`API call failed with key ending in ...${key.slice(-4)}. Error: ${error.message}`);
+            lastError = error;
+
+            // Check if the error is a quota/authentication error to justify a retry
+            const isQuotaError = (error instanceof OpenAI.APIError && (error.status === 429 || error.status === 401)) ||
+                                 (error instanceof GoogleGenerativeAIError && (error.message.includes('QUOTA') || error.message.includes('API_KEY')));
+
+            if (!isQuotaError) {
+                // If it's not a quota error, don't retry with another key as it's likely a different issue.
+                throw error;
+            }
+        }
+    }
+    // If all keys fail, throw the last encountered error.
+    throw lastError;
+}
+
+
 export async function callGenerativeAI<T extends z.ZodType<any, any>>(
   params: CallGenerativeAIParams<T>
 ): Promise<z.infer<T>> {
@@ -40,27 +93,25 @@ export async function callGenerativeAI<T extends z.ZodType<any, any>>(
 
   const provider = getProviderFromModel(model);
 
-  let finalApiKey: string | undefined = apiKey?.key;
+  // If a user-specific API key is provided in the settings, use it directly without rotation.
+  if (apiKey?.key) {
+    console.log(`Using user-provided API key for ${provider}.`);
+    return callAI(provider, apiKey.key, model, systemPrompt, userPrompt, schema);
+  }
+  
+  // Otherwise, use the server's environment keys with the retry/rotation logic.
+  console.log(`Using server-provided API keys for ${provider} with rotation.`);
+  const envKeys = provider === 'openai' 
+    ? [process.env.OPENAI_API_KEY_1, process.env.OPENAI_API_KEY_2]
+    : [process.env.GEMINI_API_KEY_1, process.env.GEMINI_API_KEY_2];
 
-  if (provider === 'openai') {
-    if (!finalApiKey) {
-        finalApiKey = process.env.OPENAI_API_KEY;
-    }
-    if (!finalApiKey) {
-        throw new Error('OpenAI API key is not configured. Please add it in the settings.');
-    }
-    return callOpenAI(finalApiKey, model, systemPrompt, userPrompt, schema);
-  } else if (provider === 'google') {
-     if (!finalApiKey) {
-        finalApiKey = process.env.GEMINI_API_KEY;
-    }
-    if (!finalApiKey) {
-        throw new Error('Gemini API key is not configured. Please add it in the settings.');
-    }
-    return callGoogleAI(finalApiKey, model, systemPrompt, userPrompt, schema);
+  const availableKeys = envKeys.filter(Boolean);
+
+  if (availableKeys.length === 0) {
+      throw new Error(`No server-side API keys configured for ${provider}. Please add them to the .env file.`);
   }
 
-  throw new Error(`Unsupported model provider for model: ${model}`);
+  return callWithRetry(provider, availableKeys, model, systemPrompt, userPrompt, schema);
 }
 
 
