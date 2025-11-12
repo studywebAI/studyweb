@@ -73,9 +73,9 @@ export function AppSidebar({ activeTool, setActiveTool }: AppSidebarProps) {
     if (!user) {
         return (
             <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => setAuthDialogOpen(true)} tooltip={{ children: 'Sign In / Sign Up', side: 'right' }}>
+                <SidebarMenuButton onClick={() => setAuthDialogOpen(true)} tooltip={{ children: 'Login / Sign Up', side: 'right' }}>
                   <LogIn />
-                  <span>Sign In</span>
+                  <span>Login</span>
                 </SidebarMenuButton>
             </SidebarMenuItem>
         )

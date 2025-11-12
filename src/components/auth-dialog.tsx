@@ -18,17 +18,22 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from './ui/form';
 
-const emailSchema = z.object({
+const authSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
+  password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
 });
 
-const otpSchema = z.object({
-  token: z.string().min(6, { message: 'Token must be 6 digits.' }).max(6),
-});
-
-type EmailFormValues = z.infer<typeof emailSchema>;
-type OtpFormValues = z.infer<typeof otpSchema>;
+type AuthFormValues = z.infer<typeof authSchema>;
 
 interface AuthDialogProps {
   open: boolean;
@@ -37,81 +42,74 @@ interface AuthDialogProps {
 
 export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
   const [isPending, startTransition] = useTransition();
-  const [showOtpForm, setShowOtpForm] = useState(false);
-  const [authEmail, setAuthEmail] = useState('');
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const { toast } = useToast();
 
-  const emailForm = useForm<EmailFormValues>({
-    resolver: zodResolver(emailSchema),
+  const form = useForm<AuthFormValues>({
+    resolver: zodResolver(authSchema),
+    defaultValues: {
+      email: '',
+      password: '',
+    },
   });
 
-  const otpForm = useForm<OtpFormValues>({
-    resolver: zodResolver(otpSchema),
-  });
-
-  const handleEmailSubmit: SubmitHandler<EmailFormValues> = async (data) => {
+  const handleSubmit: SubmitHandler<AuthFormValues> = async (data) => {
     startTransition(async () => {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: data.email,
-        options: {
-          shouldCreateUser: true,
-        },
-      });
+      if (authMode === 'login') {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: data.email,
+          password: data.password,
+        });
 
-      if (error) {
-        toast({
-          title: 'Error',
-          description: error.message,
-          variant: 'destructive',
+        if (error) {
+          toast({
+            title: 'Login Failed',
+            description: error.message,
+            variant: 'destructive',
+          });
+        } else {
+          toast({
+            title: 'Success!',
+            description: 'You are now logged in.',
+          });
+          onOpenChange(false);
+          // The onAuthStateChange listener in AppProvider will handle the rest
+        }
+      } else { // Sign Up
+        const { data: { user }, error } = await supabase.auth.signUp({
+          email: data.email,
+          password: data.password,
         });
-      } else {
-        setAuthEmail(data.email);
-        setShowOtpForm(true);
-        toast({
-          title: 'Check your email',
-          description: 'We sent you a one-time password.',
-        });
-      }
-    });
-  };
 
-  const handleOtpSubmit: SubmitHandler<OtpFormValues> = async (data) => {
-    if(!authEmail) return;
-
-    startTransition(async () => {
-        const { data: { session }, error } = await supabase.auth.verifyOtp({
-            email: authEmail,
-            token: data.token,
-            type: 'email',
-        });
-      
-      if (error) {
-        toast({
-          title: 'Error',
-          description: error.message,
-          variant: 'destructive',
-        });
-      } else if(session) {
-        toast({
-          title: 'Success!',
-          description: 'You are now signed in.',
-        });
-        onOpenChange(false);
-        // The onAuthStateChange listener in AppProvider will handle the rest
+        if (error) {
+           toast({
+            title: 'Sign Up Failed',
+            description: error.message,
+            variant: 'destructive',
+          });
+        } else if (user && !user.email_confirmed_at) {
+          toast({
+            title: 'Account Created!',
+            description: 'Please check your email to confirm your account before logging in.',
+          });
+          // Stay on signup form but show success
+        } else {
+            toast({
+                title: 'Account Created & Confirmed!',
+                description: "You're ready to log in.",
+            });
+            setAuthMode('login'); // Switch to login tab
+        }
       }
     });
   };
 
   const handleDialogChange = (isOpen: boolean) => {
     if (!isOpen) {
-        // Reset state on close
-        setShowOtpForm(false);
-        setAuthEmail('');
-        emailForm.reset();
-        otpForm.reset();
+      form.reset();
     }
     onOpenChange(isOpen);
-  }
+  };
 
   return (
     <Dialog open={open} onOpenChange={handleDialogChange}>
@@ -119,40 +117,96 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
         <DialogHeader>
           <DialogTitle>Get Started</DialogTitle>
           <DialogDescription>
-            {showOtpForm 
-             ? `Enter the 6-digit code sent to ${authEmail}.`
-             : 'Sign in or create an account to save your progress.'}
+            {authMode === 'login' 
+                ? 'Login to your account to access your saved sessions.'
+                : 'Create an account to save your progress.'}
           </DialogDescription>
         </DialogHeader>
-        
-        {!showOtpForm ? (
-            <form onSubmit={emailForm.handleSubmit(handleEmailSubmit)} className="space-y-4">
-                <div className="space-y-2">
-                    <Label htmlFor="email">Email Address</Label>
-                    <Input id="email" type="email" placeholder="you@example.com" {...emailForm.register('email')} />
-                    {emailForm.formState.errors.email && <p className="text-sm text-destructive">{emailForm.formState.errors.email.message}</p>}
-                </div>
-                <Button type="submit" className="w-full" disabled={isPending}>
-                    {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Continue with Email
-                </Button>
-            </form>
-        ) : (
-            <form onSubmit={otpForm.handleSubmit(handleOtpSubmit)} className="space-y-4">
-                <div className="space-y-2">
-                    <Label htmlFor="token">One-Time Password</Label>
-                    <Input id="token" type="text" placeholder="123456" {...otpForm.register('token')} />
-                    {otpForm.formState.errors.token && <p className="text-sm text-destructive">{otpForm.formState.errors.token.message}</p>}
-                </div>
-                <Button type="submit" className="w-full" disabled={isPending}>
-                     {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Verify & Sign In
-                </Button>
-                <Button variant="link" size="sm" className="w-full" onClick={() => setShowOtpForm(false)}>Use a different email</Button>
-            </form>
-        )}
 
-        <DialogFooter className="text-xs text-muted-foreground text-center">
+        <Tabs
+          value={authMode}
+          onValueChange={(value) => setAuthMode(value as 'login' | 'signup')}
+          className="w-full"
+        >
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="login">Login</TabsTrigger>
+            <TabsTrigger value="signup">Sign Up</TabsTrigger>
+          </TabsList>
+          <TabsContent value="login">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 pt-4">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email Address</FormLabel>
+                      <FormControl>
+                        <Input placeholder="you@example.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" className="w-full" disabled={isPending}>
+                  {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Login
+                </Button>
+              </form>
+            </Form>
+          </TabsContent>
+          <TabsContent value="signup">
+             <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 pt-4">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email Address</FormLabel>
+                      <FormControl>
+                        <Input placeholder="you@example.com" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" className="w-full" disabled={isPending}>
+                  {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Create Account
+                </Button>
+              </form>
+            </Form>
+          </TabsContent>
+        </Tabs>
+
+        <DialogFooter className="pt-4 text-xs text-muted-foreground text-center">
           By continuing, you agree to our Terms of Service.
         </DialogFooter>
       </DialogContent>
