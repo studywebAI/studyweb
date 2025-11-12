@@ -37,7 +37,7 @@ export function SummaryTool() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { addRecent, globalModel, modelOverrides, apiKeys } = useApp();
+  const { addSession, globalModel, modelOverrides, apiKeys } = useApp();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -86,10 +86,11 @@ export function SummaryTool() {
 
       const formattedSummary = `### ${tldr}\n\n**Key Points:**\n${keyPoints.map(p => `- ${p}`).join('\n')}\n\n---\n\n### Detailed Summary\n${detailedSummary}`;
 
-      addRecent({
+      addSession({
         title: text.substring(0, 30) + '...',
-        type: 'Summary',
-        content: fullText,
+        type: 'summary',
+        content: result, // Save the full summary object
+        userId: '' // Handled by provider
       });
 
       // Deactivate streaming animation for simplicity with multiple providers

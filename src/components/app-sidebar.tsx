@@ -46,7 +46,7 @@ const toolConfig = {
 };
 
 export function AppSidebar({ activeTool, setActiveTool }: AppSidebarProps) {
-  const { recents, user, isAuthLoading } = useApp();
+  const { sessions, user, isAuthLoading } = useApp();
   const { state } = useSidebar();
   const [isAuthDialogOpen, setAuthDialogOpen] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
@@ -115,7 +115,7 @@ export function AppSidebar({ activeTool, setActiveTool }: AppSidebarProps) {
             <SidebarMenu>
               {isAuthLoading ? (
                 Array.from({length: 3}).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)
-              ) : recents.map((item) => (
+              ) : sessions.map((item) => (
                  <SidebarMenuItem key={item.id}>
                   <SidebarMenuButton
                       size="sm"
@@ -124,7 +124,7 @@ export function AppSidebar({ activeTool, setActiveTool }: AppSidebarProps) {
                       tooltip={{ children: item.title, side: 'right' }}
                   >
                       <span className="font-medium text-sm">{item.title}</span>
-                      <span className="text-xs text-muted-foreground">{item.type} • {item.time}</span>
+                      <span className="text-xs text-muted-foreground">{item.type} • {new Date(item.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit'})}</span>
                   </SidebarMenuButton>
                  </SidebarMenuItem>
               ))}

@@ -12,12 +12,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from './ui/dialog';
-import { useApp, RecentItem } from './app-provider';
+import { useApp, StudySession } from './app-provider';
 import { ScrollArea } from './ui/scroll-area';
 
 interface InputAreaProps {
   onSubmit: (text: string) => void;
-  onImport?: (item: RecentItem) => void;
+  onImport?: (item: StudySession) => void;
   isLoading: boolean;
   showImport: boolean;
 }
@@ -31,7 +31,7 @@ export function InputArea({
   const [text, setText] = useState('');
   const [isImportOpen, setImportOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { recents } = useApp();
+  const { sessions } = useApp();
 
   const handleTextChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(event.target.value);
@@ -59,8 +59,8 @@ export function InputArea({
     }
   };
 
-  const handleImport = (item: RecentItem) => {
-    if (onImport) {
+  const handleImport = (item: StudySession) => {
+    if (onImport && typeof item.content === 'string') {
       onImport(item);
     }
     setImportOpen(false);
@@ -107,8 +107,8 @@ export function InputArea({
                 </DialogHeader>
                 <ScrollArea className="h-96">
                   <div className="space-y-2 p-1">
-                    {recents.length > 0 ? (
-                      recents.map((item) => (
+                    {sessions.length > 0 ? (
+                      sessions.map((item) => (
                         <button
                           key={item.id}
                           onClick={() => handleImport(item)}
@@ -116,7 +116,7 @@ export function InputArea({
                         >
                           <p className="font-semibold">{item.title}</p>
                           <p className="text-sm text-muted-foreground">
-                            {item.type} &bull; {item.time}
+                            {item.type} &bull; {new Date(item.createdAt).toLocaleTimeString()}
                           </p>
                         </button>
                       ))

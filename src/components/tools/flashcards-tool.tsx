@@ -7,7 +7,7 @@ import { InputArea } from '../input-area';
 import { handleGenerateFlashcards, handleGenerateAnswer } from '@/app/actions';
 import { Skeleton } from '../ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { useApp, type RecentItem } from '../app-provider';
+import { useApp, type StudySession } from '../app-provider';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Button } from '../ui/button';
 import { cn, downloadFile } from '@/lib/utils';
@@ -126,7 +126,7 @@ export function FlashcardsTool() {
   const [isFlipped, setIsFlipped] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const cardStartTime = useRef(Date.now());
-  const { addRecent, globalModel, modelOverrides, apiKeys } = useApp();
+  const { addSession, globalModel, modelOverrides, apiKeys } = useApp();
 
   useEffect(() => {
     // Reset timer when card changes or when starting a new session
@@ -184,10 +184,11 @@ export function FlashcardsTool() {
       }));
       setAllCards(newSessionCards);
       startNewSession(newSessionCards);
-      addRecent({
+      addSession({
         title: text.substring(0, 30) + '...',
-        type: 'Flashcards',
-        content: text,
+        type: 'flashcards',
+        content: result,
+        userId: '' // Handled by provider
       });
     } catch (e: any) {
       const errorMessage = e.message || 'An unknown error occurred.';
@@ -198,8 +199,23 @@ export function FlashcardsTool() {
     }
   };
   
-  const handleImport = (item: RecentItem) => {
-    generateFlashcards(item.content);
+  const handleImport = (item: StudySession) => {
+     if(typeof item.content === 'string') {
+        generateFlashcards(item.content);
+      } else {
+        // If content is already a flashcard object
+        const flashcardContent = item.content as { cards: Flashcard[] };
+        if (flashcardContent.cards) {
+            const newSessionCards = flashcardContent.cards.map(card => ({
+              ...card,
+              isCorrect: null,
+              timeSpent: 0,
+              flips: 0
+            }));
+            setAllCards(newSessionCards);
+            startNewSession(newSessionCards);
+        }
+      }
   };
   
   const handleFlip = () => {

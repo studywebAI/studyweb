@@ -6,19 +6,22 @@ import type { Session, User } from '@supabase/supabase-js';
 
 export type Tool = 'summary' | 'quiz' | 'flashcards' | 'answer';
 
-export interface RecentItem {
+export interface StudySession {
   id: string;
+  type: 'summary' | 'quiz' | 'flashcards';
   title: string;
-  type: 'Summary' | 'Quiz' | 'Flashcards';
-  time: string;
-  content: string;
+  content: string | object;
+  createdAt: number;
+  updatedAt: number;
+  isSynced: boolean;
+  userId?: string;
 }
 
 interface AppContextType {
   activeTool: Tool;
   setActiveTool: (tool: Tool) => void;
-  recents: RecentItem[];
-  addRecent: (item: Omit<RecentItem, 'id' | 'time'>) => void;
+  sessions: StudySession[];
+  addSession: (item: Omit<StudySession, 'id' | 'createdAt' | 'updatedAt' | 'isSynced'>) => void;
   user: User | null;
   session: Session | null;
   isAuthLoading: boolean;
@@ -33,13 +36,13 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_KEY_RECENTS = 'studygenius_recents';
+const LOCAL_STORAGE_KEY_SESSIONS = 'studygenius_sessions';
 const LOCAL_STORAGE_KEY_SETTINGS = 'studygenius_settings';
 
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [activeTool, setActiveTool] = useState<Tool>('summary');
-  const [recents, setRecents] = useState<RecentItem[]>([]);
+  const [sessions, setSessions] = useState<StudySession[]>([]);
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
@@ -97,11 +100,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
         
         if (session) {
-          // TODO: Fetch data from Supabase
+          // TODO: Fetch data from Supabase and merge with local
         } else {
           // Load from localStorage for guests
-          const localData = localStorage.getItem(LOCAL_STORAGE_KEY_RECENTS);
-          setRecents(localData ? JSON.parse(localData) : []);
+          const localData = localStorage.getItem(LOCAL_STORAGE_KEY_SESSIONS);
+          setSessions(localData ? JSON.parse(localData) : []);
         }
         setIsAuthLoading(false);
       }
@@ -112,8 +115,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         if (!session) {
-             const localData = localStorage.getItem(LOCAL_STORAGE_KEY_RECENTS);
-             setRecents(localData ? JSON.parse(localData) : []);
+             const localData = localStorage.getItem(LOCAL_STORAGE_KEY_SESSIONS);
+             setSessions(localData ? JSON.parse(localData) : []);
         }
         setIsAuthLoading(false);
     });
@@ -123,34 +126,38 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Update localStorage whenever recents change for a guest user
+  // Update localStorage whenever sessions change for a guest user
   useEffect(() => {
     if (!user) {
-      localStorage.setItem(LOCAL_STORAGE_KEY_RECENTS, JSON.stringify(recents));
+      localStorage.setItem(LOCAL_STORAGE_KEY_SESSIONS, JSON.stringify(sessions));
     }
-  }, [recents, user]);
+  }, [sessions, user]);
 
-  const addRecent = (item: Omit<RecentItem, 'id' | 'time'>) => {
-    const newItem: RecentItem = {
+  const addSession = (item: Omit<StudySession, 'id' | 'createdAt' | 'updatedAt' | 'isSynced'>) => {
+    const now = Date.now();
+    const newSession: StudySession = {
       ...item,
-      id: Date.now().toString(),
-      time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit'}),
+      id: crypto.randomUUID(),
+      createdAt: now,
+      updatedAt: now,
+      isSynced: !!user, // Synced if user is logged in
+      userId: user?.id,
     };
     
     if (user) {
         // TODO: Save to supabase
         console.log("Saving to supabase (not implemented yet)");
-        setRecents(prev => [newItem, ...prev].slice(0, 10));
+        setSessions(prev => [newSession, ...prev]);
     } else {
-        setRecents(prev => [newItem, ...prev].slice(0, 10));
+        setSessions(prev => [newSession, ...prev]);
     }
   };
   
   const appContextValue: AppContextType = {
     activeTool,
     setActiveTool,
-    recents,
-    addRecent,
+    sessions,
+    addSession,
     user,
     session,
     isAuthLoading,

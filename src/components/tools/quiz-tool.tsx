@@ -11,7 +11,7 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { cn, downloadFile } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
-import { useApp, type RecentItem } from '../app-provider';
+import { useApp, type StudySession } from '../app-provider';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../ui/accordion';
 
@@ -54,7 +54,7 @@ export function QuizTool() {
   const [isRetrying, setIsRetrying] = useState(false);
 
 
-  const { addRecent, globalModel, modelOverrides, apiKeys } = useApp();
+  const { addSession, globalModel, modelOverrides, apiKeys } = useApp();
 
   const handleOptionsChange = (newOptions: Partial<QuizOptions>) => {
     setOptions(prev => ({ ...prev, ...newOptions }));
@@ -102,10 +102,11 @@ export function QuizTool() {
       startQuiz(result.questions, text);
 
       if(!forRetry) {
-        addRecent({
+        addSession({
           title: text.substring(0, 30) + '...',
-          type: 'Quiz',
-          content: text,
+          type: 'quiz',
+          content: result,
+          userId: '' // Handled by provider
         });
       }
     } catch (e: any) {
@@ -118,8 +119,16 @@ export function QuizTool() {
     }
   };
 
-  const handleImport = (item: RecentItem) => {
-    generateQuiz(item.content);
+  const handleImport = (item: StudySession) => {
+      if(typeof item.content === 'string') {
+        generateQuiz(item.content);
+      } else {
+        // If content is already a quiz object
+        const quizContent = item.content as { questions: Question[] };
+        if (quizContent.questions) {
+            startQuiz(quizContent.questions, item.title);
+        }
+      }
   };
 
   const handleFinishQuiz = async () => {
