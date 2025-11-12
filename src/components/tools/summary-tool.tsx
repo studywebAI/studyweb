@@ -3,12 +3,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ToolOptionsBar, type SummaryOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
 import { handleGenerateSummary } from '@/app/actions';
-import { Bot, User, FileText } from 'lucide-react';
+import { Bot, User, FileText, Printer } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
 import { useApp } from '../app-provider';
 import Markdown from 'react-markdown';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
+import { Button } from '../ui/button';
 
 
 interface Message {
@@ -111,7 +112,7 @@ export function SummaryTool() {
   };
 
   const WelcomeScreen = () => (
-    <div className="flex flex-col items-center justify-center h-full text-center p-8">
+    <div className="flex flex-col items-center justify-center h-full text-center p-8 hide-on-print">
       <div className="bg-primary/10 p-4 rounded-full mb-4">
         <FileText className="w-10 h-10 text-primary" />
       </div>
@@ -124,15 +125,17 @@ export function SummaryTool() {
   
   return (
     <div className="flex h-screen flex-col bg-background">
-      <ToolOptionsBar
-        activeTool="summary"
-        summaryOptions={options}
-        onSummaryOptionsChange={handleOptionsChange}
-      />
+      <div className="hide-on-print">
+        <ToolOptionsBar
+            activeTool="summary"
+            summaryOptions={options}
+            onSummaryOptionsChange={handleOptionsChange}
+        />
+      </div>
       <div className="flex-grow overflow-y-auto p-4 md:p-6">
         <div className="mx-auto max-w-3xl space-y-6">
           {error && (
-            <Alert variant="destructive">
+            <Alert variant="destructive" className="hide-on-print">
               <AlertTitle>Error</AlertTitle>
               <AlertDescription>{error}</AlertDescription>
             </Alert>
@@ -142,7 +145,7 @@ export function SummaryTool() {
             <div
               key={i}
               className={cn(
-                'flex items-start gap-4',
+                'flex items-start gap-4 hide-on-print',
                 msg.role === 'user' ? 'justify-end' : 'justify-start'
               )}
             >
@@ -153,7 +156,7 @@ export function SummaryTool() {
               )}
               <div
                 className={cn(
-                  'max-w-[80%] rounded-lg p-4',
+                  'max-w-[80%] rounded-lg p-4 relative group',
                   msg.role === 'user'
                     ? 'bg-primary/10'
                     : 'bg-card border'
@@ -167,11 +170,21 @@ export function SummaryTool() {
                   </div>
                 ) : (
                   msg.role === 'ai' ? (
-                    <article className="prose prose-sm max-w-none dark:prose-invert">
-                      <Markdown>{msg.content}</Markdown>
-                    </article>
+                    <>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => window.print()}
+                        >
+                            <Printer className="h-4 w-4" />
+                        </Button>
+                        <article className="prose prose-sm max-w-none dark:prose-invert printable-content">
+                            <Markdown>{msg.content}</Markdown>
+                        </article>
+                    </>
                   ) : (
-                    <p>{msg.content}</p>
+                    <p className="printable-content">{msg.content}</p>
                   )
                 )}
               </div>
@@ -185,7 +198,9 @@ export function SummaryTool() {
            <div ref={messagesEndRef} />
         </div>
       </div>
-      <InputArea onSubmit={handleSubmit} isLoading={isLoading} showImport={false}/>
+      <div className="hide-on-print">
+        <InputArea onSubmit={handleSubmit} isLoading={isLoading} showImport={false}/>
+      </div>
     </div>
   );
 }
