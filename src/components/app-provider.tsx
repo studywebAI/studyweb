@@ -10,7 +10,7 @@ export interface StudySession {
   id: string;
   type: 'summary' | 'quiz' | 'flashcards';
   title: string;
-  content: string | object;
+  content: any; // Can be string for summary, object for quiz/flashcards
   createdAt: number;
   updatedAt: number;
   isSynced: boolean;
@@ -128,10 +128,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Update localStorage whenever sessions change for a guest user
   useEffect(() => {
-    if (!user) {
+    if (!user && !isAuthLoading) {
       localStorage.setItem(LOCAL_STORAGE_KEY_SESSIONS, JSON.stringify(sessions));
     }
-  }, [sessions, user]);
+  }, [sessions, user, isAuthLoading]);
 
   const addSession = (item: Omit<StudySession, 'id' | 'createdAt' | 'updatedAt' | 'isSynced'>) => {
     const now = Date.now();

@@ -185,10 +185,9 @@ export function FlashcardsTool() {
       setAllCards(newSessionCards);
       startNewSession(newSessionCards);
       addSession({
-        title: text.substring(0, 30) + '...',
+        title: text.substring(0, 40) + (text.length > 40 ? '...' : ''),
         type: 'flashcards',
-        content: result,
-        userId: '' // Handled by provider
+        content: result
       });
     } catch (e: any) {
       const errorMessage = e.message || 'An unknown error occurred.';

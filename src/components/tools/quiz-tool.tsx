@@ -103,10 +103,9 @@ export function QuizTool() {
 
       if(!forRetry) {
         addSession({
-          title: text.substring(0, 30) + '...',
+          title: text.substring(0, 40) + (text.length > 40 ? '...' : ''),
           type: 'quiz',
-          content: result,
-          userId: '' // Handled by provider
+          content: result
         });
       }
     } catch (e: any) {

@@ -80,24 +80,17 @@ export function SummaryTool() {
       });
       let fullText = result.summary;
 
-      const tldr = "TL;DR: " + fullText.split('.').slice(0, 1).join('.') + ".";
-      const keyPoints = fullText.split('. ').slice(1, 4).map(s => s.trim()).filter(s => s);
-      const detailedSummary = fullText;
-
-      const formattedSummary = `### ${tldr}\n\n**Key Points:**\n${keyPoints.map(p => `- ${p}`).join('\n')}\n\n---\n\n### Detailed Summary\n${detailedSummary}`;
-
       addSession({
-        title: text.substring(0, 30) + '...',
+        title: text.substring(0, 40) + (text.length > 40 ? '...' : ''),
         type: 'summary',
-        content: result, // Save the full summary object
-        userId: '' // Handled by provider
+        content: result.summary,
       });
 
       // Deactivate streaming animation for simplicity with multiple providers
       setMessages((prev) =>
           prev.map((msg, index) =>
             index === prev.length - 1
-              ? { ...msg, content: formattedSummary, isStreaming: false }
+              ? { ...msg, content: fullText, isStreaming: false }
               : msg
           )
         );
