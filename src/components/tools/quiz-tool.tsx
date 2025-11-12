@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Lightbulb, CheckCircle2, XCircle, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
+import { Lightbulb, CheckCircle2, XCircle, ChevronRight, Loader2, AlertTriangle, Printer } from 'lucide-react';
 import { ToolOptionsBar, type QuizOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
 import { handleGenerateQuiz, handleGradeAnswer } from '@/app/actions';
@@ -217,7 +217,7 @@ export function QuizTool() {
   );
 
   const WelcomeScreen = () => (
-    <div className="flex flex-col items-center justify-center h-full text-center p-8">
+    <div className="flex flex-col items-center justify-center h-full text-center p-8 hide-on-print">
       <div className="bg-primary/10 p-4 rounded-full mb-4">
         <Lightbulb className="w-10 h-10 text-primary" />
       </div>
@@ -230,7 +230,7 @@ export function QuizTool() {
   );
   
   const LoadingScreen = () => (
-     <div className="mx-auto max-w-2xl p-4 md:p-6 space-y-8">
+     <div className="mx-auto max-w-2xl p-4 md:p-6 space-y-8 hide-on-print">
         <div className="space-y-4">
             <Skeleton className="h-8 w-3/4" />
             <Skeleton className="h-6 w-full" />
@@ -254,13 +254,22 @@ export function QuizTool() {
     const incorrectCount = totalQuestions - correctAnswersCount - partiallyCorrectCount;
 
     return (
-        <div className="mx-auto max-w-2xl p-4 md:p-6">
+        <div className="mx-auto max-w-2xl p-4 md:p-6 printable-content">
             <Card>
-                <CardHeader>
+                <CardHeader className="relative">
                     <CardTitle className="text-center">Quiz Complete!</CardTitle>
                     <CardDescription className="text-center">
                         Here's how you did.
                     </CardDescription>
+                     <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-4 right-4 h-8 w-8 hide-on-print"
+                        onClick={() => window.print()}
+                      >
+                        <Printer className="h-5 w-5" />
+                        <span className="sr-only">Save as PDF</span>
+                      </Button>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     <div className="text-center">
@@ -324,7 +333,7 @@ export function QuizTool() {
                        })}
                     </Accordion>
                     
-                    <div className="flex justify-center gap-4 pt-4">
+                    <div className="flex justify-center gap-4 pt-4 hide-on-print">
                         <Button onClick={handleReviewAllAgain}>Review All Again</Button>
                         <Button 
                             variant="outline"
@@ -346,7 +355,7 @@ export function QuizTool() {
     if (!currentQuestion) return null;
 
     return (
-      <div className="mx-auto max-w-2xl p-4 md:p-6">
+      <div className="mx-auto max-w-2xl p-4 md:p-6 hide-on-print">
         <Card>
           <CardHeader>
             <CardTitle>
@@ -389,7 +398,7 @@ export function QuizTool() {
     }
     if (isGrading) {
         return (
-            <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+            <div className="flex flex-col items-center justify-center h-full p-8 text-center hide-on-print">
                 <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
                 <h2 className="text-2xl font-semibold">Grading your answers...</h2>
                 <p className="text-muted-foreground">Please wait while the AI evaluates your responses.</p>
@@ -418,7 +427,9 @@ export function QuizTool() {
       <div className="flex-grow overflow-y-auto">
         {renderContent()}
       </div>
-      <InputArea onSubmit={generateQuiz} onImport={handleImport} isLoading={isLoading} showImport={true}/>
+      <div className="hide-on-print">
+        <InputArea onSubmit={generateQuiz} onImport={handleImport} isLoading={isLoading} showImport={true}/>
+      </div>
     </div>
   );
 }
