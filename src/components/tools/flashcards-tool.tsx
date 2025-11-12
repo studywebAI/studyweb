@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Layers, Check, X, RotateCw, BarChart, ArrowRight, Timer, Eye, BrainCircuit } from 'lucide-react';
+import { Layers, Check, X, RotateCw, BarChart, ArrowRight, Timer, Eye, BrainCircuit, HelpCircle } from 'lucide-react';
 import { ToolOptionsBar, type FlashcardOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
 import { handleGenerateFlashcards } from '@/app/actions';
@@ -12,6 +12,13 @@ import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Button } from '../ui/button';
 import { cn } from '@/lib/utils';
 import { Separator } from '../ui/separator';
+import { Textarea } from '../ui/textarea';
+import { Label } from '../ui/label';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 
 interface Flashcard {
   front: string;
@@ -206,21 +213,37 @@ export function FlashcardsTool() {
         </div>
       </div>
       <Card className="w-full max-w-md aspect-video [perspective:1000px]">
-        <button
-          onClick={handleFlip}
+        <div
           className={cn(
             "relative h-full w-full rounded-lg shadow-md transition-transform duration-500 [transform-style:preserve-3d]",
-            isFlipped && "[transform:rotateY(180deg)]",
-            "focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            isFlipped && "[transform:rotateY(180deg)]"
           )}
         >
           <div className="absolute inset-0 flex items-center justify-center bg-card p-6 [backface-visibility:hidden]">
             <h2 className="text-center font-bold text-2xl">{card.front}</h2>
           </div>
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-card p-6 [transform:rotateY(180deg)] [backface-visibility:hidden]">
-            <h3 className="text-center text-xl font-semibold">{card.back}</h3>
+             <Collapsible className="w-full h-full flex flex-col">
+              <div className="flex-grow flex items-center justify-center">
+                <h3 className="text-center text-xl font-semibold">{card.back}</h3>
+              </div>
+              <CollapsibleContent className="p-4 border-t text-sm bg-background rounded-b-lg">
+                  <p className="font-semibold mb-2">Explanation</p>
+                  <p className="text-muted-foreground mb-4">{card.explanation}</p>
+                   <div className="space-y-2">
+                        <Label htmlFor="follow-up-q">Have a follow-up question?</Label>
+                        <Textarea id="follow-up-q" placeholder="Ask about this concept..." className="min-h-[60px]" />
+                        <Button size="sm" className="w-full">Ask AI</Button>
+                    </div>
+              </CollapsibleContent>
+               <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-8 w-8">
+                        <HelpCircle className="h-5 w-5" />
+                    </Button>
+                </CollapsibleTrigger>
+            </Collapsible>
           </div>
-        </button>
+        </div>
       </Card>
       <div className="w-full max-w-md mt-6 flex justify-center items-center gap-4">
         {isFlipped ? (
@@ -356,3 +379,5 @@ export function FlashcardsTool() {
     </div>
   );
 }
+
+    
