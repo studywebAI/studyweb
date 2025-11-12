@@ -76,6 +76,7 @@ export function QuizTool() {
     } else {
         setIsRetrying(true);
     }
+    setError(null);
     const model = modelOverrides.quiz || globalModel;
     const provider = getProviderFromModel(model);
     const apiKey = apiKeys[provider];
@@ -209,7 +210,7 @@ export function QuizTool() {
   const ErrorDisplay = ({ message }: { message: string }) => (
     <div className="flex flex-col items-center justify-center h-full p-8">
       <Alert variant="destructive" className="max-w-lg">
-        <AlertTitle>Generation Failed</AlertTitle>
+        <AlertTitle>Error</AlertTitle>
         <AlertDescription>{message}</AlertDescription>
       </Alert>
     </div>
@@ -371,7 +372,7 @@ export function QuizTool() {
             </div>
             
             <div className="mt-6 flex justify-end">
-                <Button onClick={handleNextQuestion} disabled={!userAnswers[currentQuestionIndex]?.trim()}>
+                <Button onClick={handleNextQuestion}>
                     {currentQuestionIndex === questions.length - 1 ? 'Finish & Grade Quiz' : 'Next Question'}
                     <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
