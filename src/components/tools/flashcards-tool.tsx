@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Layers, Check, X, RotateCw, BarChart, ArrowRight, Timer, Eye, BrainCircuit, HelpCircle } from 'lucide-react';
+import { Layers, Check, X, RotateCw, BarChart, ArrowRight, Timer, Eye, BrainCircuit, HelpCircle, Bot, Loader2 } from 'lucide-react';
 import { ToolOptionsBar, type FlashcardOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
-import { handleGenerateFlashcards } from '@/app/actions';
+import { handleGenerateFlashcards, handleGenerateAnswer } from '@/app/actions';
 import { Skeleton } from '../ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { useApp, type RecentItem } from '../app-provider';
@@ -38,6 +38,79 @@ function getProviderFromModel(model: string): 'openai' | 'google' {
       return 'google';
     }
     return 'openai';
+}
+
+const FollowUpQandA = ({ card }: { card: Flashcard }) => {
+    const [followUpQuestion, setFollowUpQuestion] = useState('');
+    const [followUpAnswer, setFollowUpAnswer] = useState('');
+    const [isAsking, setIsAsking] = useState(false);
+    const [askError, setAskError] = useState<string | null>(null);
+    const { globalModel, modelOverrides, apiKeys } = useApp();
+
+    const handleAskFollowUp = async () => {
+        if (!followUpQuestion.trim()) return;
+
+        setIsAsking(true);
+        setAskError(null);
+        setFollowUpAnswer('');
+
+        const model = modelOverrides.answer || globalModel;
+        const provider = getProviderFromModel(model);
+        const apiKey = apiKeys[provider];
+
+        if (!apiKey) {
+            setAskError(`API key for ${provider} is not set. Please add it in Settings.`);
+            setIsAsking(false);
+            return;
+        }
+        
+        // Construct a detailed context for the AI
+        const context = `I am studying a flashcard.
+        Term (Front): "${card.front}"
+        Definition (Back): "${card.back}"
+        Explanation: "${card.explanation}"
+        
+        Based on this context, please answer my follow-up question.`;
+
+        try {
+            const result = await handleGenerateAnswer({
+                text: followUpQuestion,
+                history: [{ role: 'user', content: context }],
+                model,
+                apiKey: { provider, key: apiKey }
+            });
+            setFollowUpAnswer(result.answer);
+        } catch (e: any) {
+            setAskError(e.message || "An error occurred while getting the answer.");
+        } finally {
+            setIsAsking(false);
+        }
+    }
+
+    return (
+        <div className="space-y-2 pt-4">
+            <Label htmlFor="follow-up-q">Have a follow-up question?</Label>
+            <Textarea 
+                id="follow-up-q" 
+                placeholder="Ask about this concept..." 
+                className="min-h-[60px]" 
+                value={followUpQuestion}
+                onChange={(e) => setFollowUpQuestion(e.target.value)}
+                disabled={isAsking}
+            />
+            <Button size="sm" className="w-full" onClick={handleAskFollowUp} disabled={isAsking || !followUpQuestion.trim()}>
+                {isAsking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Ask AI
+            </Button>
+            {askError && <p className="text-xs text-destructive">{askError}</p>}
+            {followUpAnswer && (
+                <div className="text-sm p-3 rounded-md bg-muted/50 border flex gap-2">
+                    <Bot className="h-4 w-4 mt-1 flex-shrink-0" />
+                    <p>{followUpAnswer}</p>
+                </div>
+            )}
+        </div>
+    )
 }
 
 export function FlashcardsTool() {
@@ -227,14 +300,10 @@ export function FlashcardsTool() {
               <div className="flex-grow flex items-center justify-center">
                 <h3 className="text-center text-xl font-semibold">{card.back}</h3>
               </div>
-              <CollapsibleContent className="p-4 border-t text-sm bg-background rounded-b-lg">
+              <CollapsibleContent className="p-4 border-t text-sm bg-background rounded-b-lg overflow-y-auto">
                   <p className="font-semibold mb-2">Explanation</p>
                   <p className="text-muted-foreground mb-4">{card.explanation}</p>
-                   <div className="space-y-2">
-                        <Label htmlFor="follow-up-q">Have a follow-up question?</Label>
-                        <Textarea id="follow-up-q" placeholder="Ask about this concept..." className="min-h-[60px]" />
-                        <Button size="sm" className="w-full">Ask AI</Button>
-                    </div>
+                   <FollowUpQandA card={card} />
               </CollapsibleContent>
                <CollapsibleTrigger asChild>
                     <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-8 w-8">
@@ -379,5 +448,3 @@ export function FlashcardsTool() {
     </div>
   );
 }
-
-    

@@ -38,7 +38,8 @@ export function AnswerTool() {
   const handleSubmit = async (text: string) => {
     setIsLoading(true);
     setError(null);
-    const newMessages: Message[] = [...messages, { role: 'user', content: text }];
+    const userMessage: Message = { role: 'user', content: text };
+    const newMessages: Message[] = [...messages, userMessage];
     setMessages(newMessages);
 
     // Add a placeholder for AI response
@@ -56,7 +57,9 @@ export function AnswerTool() {
     }
 
     try {
-      const history = newMessages.filter(m => !m.isStreaming).map(m => ({role: m.role, content: m.content})) as {role: 'user' | 'ai', content: string}[];
+      // The history should only include the user message for this turn, plus any previous turns.
+      // The `newMessages` array already includes the current user message.
+      const history = newMessages.slice(0, -1).map(m => ({role: m.role, content: m.content})) as {role: 'user' | 'ai', content: string}[];
       
       const result = await handleGenerateAnswer({ 
           text, 
