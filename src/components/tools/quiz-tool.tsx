@@ -40,6 +40,7 @@ function getProviderFromModel(model: string): 'openai' | 'google' {
 
 export function QuizTool() {
   const [options, setOptions] = useState<QuizOptions>({ questionCount: 10, difficulty: 'medium' });
+  const [sourceText, setSourceText] = useState('');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,16 +56,19 @@ export function QuizTool() {
     setOptions(prev => ({ ...prev, ...newOptions }));
   };
 
-  const generateQuiz = async (text: string) => {
-    setIsLoading(true);
-    setQuestions([]);
-    setError(null);
+  const startQuiz = (quizQuestions: Question[], originalText: string) => {
+    setQuestions(quizQuestions);
+    setSourceText(originalText);
     setCurrentQuestionIndex(0);
     setSelectedAnswer(null);
     setIsAnswered(false);
     setAnswers([]);
     setShowResults(false);
-    
+    setError(null);
+  };
+  
+  const generateQuiz = async (text: string) => {
+    setIsLoading(true);
     const model = modelOverrides.quiz || globalModel;
     const provider = getProviderFromModel(model);
     const apiKey = apiKeys[provider];
@@ -85,7 +89,9 @@ export function QuizTool() {
               difficulty: options.difficulty 
             } 
         });
-      setQuestions(result.questions);
+      
+      startQuiz(result.questions, text);
+
       addRecent({
         title: text.substring(0, 30) + '...',
         type: 'Quiz',
@@ -126,12 +132,29 @@ export function QuizTool() {
     setIsAnswered(true);
   }
 
-  const handleRestartQuiz = () => {
-    setCurrentQuestionIndex(0);
-    setSelectedAnswer(null);
-    setIsAnswered(false);
-    setAnswers([]);
-    setShowResults(false);
+  const handleReviewAllAgain = () => {
+    startQuiz(questions, sourceText);
+  }
+
+  const handleRetryIncorrect = async () => {
+    const incorrectQuestions = answers.filter(a => !a.isCorrect).map(a => questions[a.questionIndex]);
+    if (incorrectQuestions.length === 0) return;
+
+    const incorrectContext = incorrectQuestions.map(q => `
+        Question: ${q.question}
+        Correct Answer: ${q.options[q.correctIndex]}
+        Explanation: ${q.explanation}
+    `).join('\n');
+
+    const newPrompt = `
+        The user previously answered questions on the following topics incorrectly.
+        Generate a new quiz with ${incorrectQuestions.length} questions to test these specific topics again.
+        
+        Incorrectly Answered Topics:
+        ${incorrectContext}
+    `;
+
+    await generateQuiz(newPrompt);
   }
 
   const ErrorDisplay = ({ message }: { message: string }) => (
@@ -176,9 +199,10 @@ export function QuizTool() {
   );
   
   const ResultsScreen = () => {
-    const correctAnswers = answers.filter(a => a.isCorrect).length;
+    const correctAnswersCount = answers.filter(a => a.isCorrect).length;
     const totalQuestions = questions.length;
-    const score = totalQuestions > 0 ? (correctAnswers / totalQuestions) * 100 : 0;
+    const score = totalQuestions > 0 ? (correctAnswersCount / totalQuestions) * 100 : 0;
+    const incorrectCount = totalQuestions - correctAnswersCount;
 
     return (
         <div className="mx-auto max-w-2xl p-4 md:p-6">
@@ -193,7 +217,7 @@ export function QuizTool() {
                     <div className="text-center">
                         <div className="text-6xl font-bold text-primary">{score.toFixed(0)}%</div>
                         <p className="text-xl text-muted-foreground">
-                            You answered {correctAnswers} out of {totalQuestions} questions correctly.
+                            You answered {correctAnswersCount} out of {totalQuestions} questions correctly.
                         </p>
                     </div>
                     
@@ -245,8 +269,15 @@ export function QuizTool() {
                     </Accordion>
                     
                     <div className="flex justify-center gap-4 pt-4">
-                        <Button onClick={handleRestartQuiz}>Take Quiz Again</Button>
-                        <Button variant="outline" disabled>Retry Incorrect</Button>
+                        <Button onClick={handleReviewAllAgain}>Review All Again</Button>
+                        <Button 
+                            variant="outline"
+                            onClick={handleRetryIncorrect}
+                            disabled={incorrectCount === 0 || isLoading}
+                        >
+                            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Retry {incorrectCount} Incorrect
+                        </Button>
                     </div>
                 </CardContent>
             </Card>
@@ -356,3 +387,5 @@ export function QuizTool() {
     </div>
   );
 }
+
+    
