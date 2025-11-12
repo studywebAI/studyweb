@@ -23,13 +23,21 @@ interface Flashcard {
   explanation: string;
 }
 
+// Helper function to determine the provider from a model name
+function getProviderFromModel(model: string): 'openai' | 'google' {
+    if (model.startsWith('gemini')) {
+      return 'google';
+    }
+    return 'openai';
+}
+
 export function FlashcardsTool() {
   const [options, setOptions] = useState<FlashcardOptions>({ cardCount: 20 });
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sourceText, setSourceText] = useState('');
-  const { addRecent, globalModel, modelOverrides } = useApp();
+  const { addRecent, globalModel, modelOverrides, apiKeys } = useApp();
 
   const handleOptionsChange = (newOptions: Partial<FlashcardOptions>) => {
     setOptions((prev) => ({ ...prev, ...newOptions }));
@@ -42,9 +50,22 @@ export function FlashcardsTool() {
     setSourceText(text);
 
     const model = modelOverrides.flashcards || globalModel;
+    const provider = getProviderFromModel(model);
+    const apiKey = apiKeys[provider];
+
+    if (!apiKey) {
+        setError(`API key for ${provider} is not set. Please add it in Settings.`);
+        setIsLoading(false);
+        return;
+    }
+
 
     try {
-      const result = await handleGenerateFlashcards({ text, model });
+      const result = await handleGenerateFlashcards({ 
+          text, 
+          model,
+          apiKey: { provider, key: apiKey }
+      });
       setFlashcards(result.cards);
       addRecent({
         title: text.substring(0, 30) + '...',

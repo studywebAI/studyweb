@@ -17,6 +17,15 @@ interface Message {
   isStreaming?: boolean;
 }
 
+// Helper function to determine the provider from a model name
+function getProviderFromModel(model: string): 'openai' | 'google' {
+    if (model.startsWith('gemini')) {
+      return 'google';
+    }
+    return 'openai';
+}
+
+
 export function SummaryTool() {
   const [options, setOptions] = useState<SummaryOptions>({
     detailLevel: 3,
@@ -27,7 +36,7 @@ export function SummaryTool() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { addRecent, globalModel, modelOverrides } = useApp();
+  const { addRecent, globalModel, modelOverrides, apiKeys } = useApp();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -47,9 +56,22 @@ export function SummaryTool() {
     setMessages((prev) => [...prev, { role: 'ai', content: '', isStreaming: true }]);
     
     const model = modelOverrides.summary || globalModel;
+    const provider = getProviderFromModel(model);
+    const apiKey = apiKeys[provider];
+
+     if (!apiKey) {
+        setError(`API key for ${provider} is not set. Please add it in Settings.`);
+        setMessages(prev => prev.slice(0, -1)); // Remove the streaming placeholder
+        setIsLoading(false);
+        return;
+    }
 
     try {
-      const result = await handleGenerateSummary({ text, model });
+      const result = await handleGenerateSummary({ 
+          text,
+          model,
+          apiKey: { provider, key: apiKey }
+      });
       let fullText = result.summary;
 
       const tldr = "TL;DR: " + fullText.split('.').slice(0, 1).join('.') + ".";
@@ -64,29 +86,15 @@ export function SummaryTool() {
         content: fullText,
       });
 
-      if (options.animation) {
-        let currentText = '';
-        const words = formattedSummary.split(' ');
-        for (let i = 0; i < words.length; i++) {
-          await new Promise((resolve) => setTimeout(resolve, 20));
-          currentText += words[i] + ' ';
-          setMessages((prev) =>
-            prev.map((msg, index) =>
-              index === prev.length - 1
-                ? { ...msg, content: currentText }
-                : msg
-            )
-          );
-        }
-      } else {
-        setMessages((prev) =>
+      // Deactivate streaming animation for simplicity with multiple providers
+      setMessages((prev) =>
           prev.map((msg, index) =>
             index === prev.length - 1
               ? { ...msg, content: formattedSummary, isStreaming: false }
               : msg
           )
         );
-      }
+
     } catch (e: any) {
       console.error('Error generating summary:', e);
        const errorMessage = e.message || 'An unknown error occurred.';

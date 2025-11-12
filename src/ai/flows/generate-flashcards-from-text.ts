@@ -6,12 +6,15 @@
  * - GenerateFlashcardsFromTextOutput - The return type for the generateFlashcardsFromText function.
  */
 
+'use server';
+
 import {z} from 'zod';
-import OpenAI from 'openai';
 import {
-    GenerateFlashcardsFromTextInputSchema,
-    GenerateFlashcardsFromTextOutputSchema
+  GenerateFlashcardsFromTextInputSchema,
+  GenerateFlashcardsFromTextOutputSchema,
 } from './schemas';
+import { callGenerativeAI } from '../unified-ai-handler';
+
 
 export type GenerateFlashcardsFromTextInput = z.infer<
   typeof GenerateFlashcardsFromTextInputSchema
@@ -21,42 +24,26 @@ export type GenerateFlashcardsFromTextOutput = z.infer<
   typeof GenerateFlashcardsFromTextOutputSchema
 >;
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 
 export async function generateFlashcardsFromText(
   input: GenerateFlashcardsFromTextInput
 ): Promise<GenerateFlashcardsFromTextOutput> {
   try {
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error('Missing OPENAI_API_KEY in environment');
-    }
+    const systemPrompt = `You are an expert at creating effective flashcards for learning. Generate a set of flashcards from the following text. Respond in JSON format. The response should be a JSON object with a single key "cards", which is an array of flashcard objects, each with "front", "back", and "explanation" keys.`;
+    const userPrompt = `Text: ${input.text}`;
 
-    const response = await openai.chat.completions.create({
-      model: input.model || 'gpt-4',
-      messages: [
-        {
-          role: 'system',
-          content: `You are an expert at creating effective flashcards for learning. Generate a set of flashcards from the following text. Respond in JSON format. The response should be a JSON object with a single key "cards", which is an array of flashcard objects, each with "front", "back", and "explanation" keys.`,
-        },
-        { role: 'user', content: `Text: ${input.text}` },
-      ],
-      temperature: 0.3,
-      response_format: { type: 'json_object' },
+    const result = await callGenerativeAI({
+        model: input.model,
+        apiKey: input.apiKey,
+        systemPrompt: systemPrompt,
+        userPrompt: userPrompt,
+        schema: GenerateFlashcardsFromTextOutputSchema,
     });
-    
-    const content = response.choices[0].message?.content;
-    if (!content) {
-      throw new Error('No content returned from OpenAI API.');
-    }
 
-    const parsed = JSON.parse(content);
-    return parsed;
+    return result;
 
   } catch (error: any) {
-    console.error("Error generating flashcards:", error);
+    console.error('Error generating flashcards:', error);
     throw error;
   }
 }

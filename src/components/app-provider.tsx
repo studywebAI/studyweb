@@ -27,12 +27,14 @@ interface AppContextType {
   modelOverrides: { [key in Tool]?: string };
   setModelOverride: (tool: Tool, model: string) => void;
   clearModelOverride: (tool: Tool) => void;
+  apiKeys: { openai: string; google: string; };
+  setApiKey: (provider: 'openai' | 'google', key: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_KEY_RECENTS = 'studygenius_recents';
-const LOCAL_STORAGE_KEY_MODELS = 'studygenius_models';
+const LOCAL_STORAGE_KEY_SETTINGS = 'studygenius_settings';
 
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
@@ -45,23 +47,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Model selection state
   const [globalModel, setGlobalModel] = useState('gpt-4o-mini');
   const [modelOverrides, setModelOverrides] = useState<{ [key in Tool]?: string }>({});
+  const [apiKeys, setApiKeys] = useState({ openai: '', google: ''});
 
 
-  // Load models from localStorage on initial render
+  // Load settings from localStorage on initial render
   useEffect(() => {
-    const savedModels = localStorage.getItem(LOCAL_STORAGE_KEY_MODELS);
-    if (savedModels) {
-      const { globalModel: savedGlobal, overrides } = JSON.parse(savedModels);
+    const savedSettings = localStorage.getItem(LOCAL_STORAGE_KEY_SETTINGS);
+    if (savedSettings) {
+      const { globalModel: savedGlobal, overrides, keys } = JSON.parse(savedSettings);
       if (savedGlobal) setGlobalModel(savedGlobal);
       if (overrides) setModelOverrides(overrides);
+      if (keys) setApiKeys(keys);
     }
   }, []);
 
-  // Save models to localStorage whenever they change
+  // Save settings to localStorage whenever they change
   useEffect(() => {
-    const modelsToSave = { globalModel, overrides: modelOverrides };
-    localStorage.setItem(LOCAL_STORAGE_KEY_MODELS, JSON.stringify(modelsToSave));
-  }, [globalModel, modelOverrides]);
+    const settingsToSave = { 
+        globalModel, 
+        overrides: modelOverrides,
+        keys: apiKeys
+    };
+    localStorage.setItem(LOCAL_STORAGE_KEY_SETTINGS, JSON.stringify(settingsToSave));
+  }, [globalModel, modelOverrides, apiKeys]);
 
   const handleSetModelOverride = (tool: Tool, model: string) => {
     setModelOverrides(prev => ({...prev, [tool]: model}));
@@ -74,6 +82,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         return newOverrides;
     });
   }
+
+  const setApiKey = (provider: 'openai' | 'google', key: string) => {
+    setApiKeys(prev => ({...prev, [provider]: key}));
+  };
 
 
   // Handle auth state changes and initial load
@@ -147,6 +159,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     modelOverrides,
     setModelOverride: handleSetModelOverride,
     clearModelOverride: handleClearModelOverride,
+    apiKeys,
+    setApiKey,
   };
 
   return (

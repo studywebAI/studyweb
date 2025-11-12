@@ -4,8 +4,12 @@
  */
 
 import {z} from 'zod';
-import OpenAI from 'openai';
-import {ImportContentForQuizGenerationInputSchema, ImportContentForQuizGenerationOutputSchema} from './schemas';
+import {
+  ImportContentForQuizGenerationInputSchema,
+  ImportContentForQuizGenerationOutputSchema,
+} from './schemas';
+import { callGenerativeAI } from '../unified-ai-handler';
+
 
 export type ImportContentForQuizGenerationInput = z.infer<
   typeof ImportContentForQuizGenerationInputSchema
@@ -15,47 +19,31 @@ export type ImportContentForQuizGenerationOutput = z.infer<
   typeof ImportContentForQuizGenerationOutputSchema
 >;
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 
 export async function importContentForQuizGeneration(
   input: ImportContentForQuizGenerationInput
 ): Promise<ImportContentForQuizGenerationOutput> {
-   try {
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error('Missing OPENAI_API_KEY in environment');
-    }
-
-    const response = await openai.chat.completions.create({
-      model: input.model || 'gpt-4',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a quiz generator. Generate a quiz from the following content.
+  try {
+    const systemPrompt = `You are a quiz generator. Generate a quiz from the following content.
     
-            The quiz should have ${input.options?.question_count || 10} questions and the difficulty should be ${input.options?.difficulty || 'medium'}.
-            
-            Respond in JSON format. The response should be a JSON object with a single key "questions", which is an array of question objects.
-            `,
-        },
-        { role: 'user', content: `Content: ${input.content}` },
-      ],
-      temperature: 0.4,
-      response_format: { type: 'json_object' },
+        The quiz should have ${input.options?.question_count || 10} questions and the difficulty should be ${input.options?.difficulty || 'medium'}.
+        
+        Respond in JSON format. The response should be a JSON object with a single key "questions", which is an array of question objects.
+        `;
+    const userPrompt = `Content: ${input.content}`;
+
+    const result = await callGenerativeAI({
+        model: input.model,
+        apiKey: input.apiKey,
+        systemPrompt: systemPrompt,
+        userPrompt: userPrompt,
+        schema: ImportContentForQuizGenerationOutputSchema,
     });
     
-    const content = response.choices[0].message?.content;
-    if (!content) {
-      throw new Error('No content returned from OpenAI API.');
-    }
-
-    const parsed = JSON.parse(content);
-    return parsed;
+    return result;
 
   } catch (error: any) {
-    console.error("Error generating quiz:", error);
+    console.error('Error generating quiz:', error);
     throw error;
   }
 }

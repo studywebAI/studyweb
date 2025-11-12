@@ -14,11 +14,19 @@ interface Message {
   isStreaming?: boolean;
 }
 
+// Helper function to determine the provider from a model name
+function getProviderFromModel(model: string): 'openai' | 'google' {
+    if (model.startsWith('gemini')) {
+      return 'google';
+    }
+    return 'openai';
+}
+
 export function AnswerTool() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { globalModel, modelOverrides } = useApp();
+  const { globalModel, modelOverrides, apiKeys } = useApp();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -37,25 +45,36 @@ export function AnswerTool() {
     setMessages((prev) => [...prev, { role: 'ai', content: '', isStreaming: true }]);
 
     const model = modelOverrides.answer || globalModel;
+    const provider = getProviderFromModel(model);
+    const apiKey = apiKeys[provider];
+
+    if (!apiKey) {
+        setError(`API key for ${provider} is not set. Please add it in Settings.`);
+        setMessages(prev => prev.slice(0, -1)); // Remove placeholder
+        setIsLoading(false);
+        return;
+    }
 
     try {
       const history = newMessages.filter(m => !m.isStreaming).map(m => ({role: m.role, content: m.content})) as {role: 'user' | 'ai', content: string}[];
-      const result = await handleGenerateAnswer({ text, history, model });
+      
+      const result = await handleGenerateAnswer({ 
+          text, 
+          history, 
+          model,
+          apiKey: { provider, key: apiKey }
+      });
+      
       const fullText = result.answer;
 
-      let currentText = '';
-      const words = fullText.split(' ');
-      for (let i = 0; i < words.length; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 20));
-        currentText += words[i] + ' ';
-        setMessages((prev) =>
-          prev.map((msg, index) =>
-            index === prev.length - 1
-              ? { ...msg, content: currentText }
-              : msg
-          )
-        );
-      }
+      // Deactivate streaming for now as it's complex with different providers
+      setMessages((prev) =>
+        prev.map((msg, index) =>
+          index === prev.length - 1
+            ? { ...msg, content: fullText, isStreaming: false }
+            : msg
+        )
+      );
 
     } catch (e: any) {
       const errorMessage = e.message || 'An unknown error occurred.';

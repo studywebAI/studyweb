@@ -22,6 +22,14 @@ interface Question {
   explanation: string;
 }
 
+// Helper function to determine the provider from a model name
+function getProviderFromModel(model: string): 'openai' | 'google' {
+    if (model.startsWith('gemini')) {
+      return 'google';
+    }
+    return 'openai';
+}
+
 export function QuizTool() {
   const [options, setOptions] = useState<QuizOptions>({ questionCount: 10, difficulty: 'medium' });
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -30,7 +38,7 @@ export function QuizTool() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
-  const { addRecent, globalModel, modelOverrides } = useApp();
+  const { addRecent, globalModel, modelOverrides, apiKeys } = useApp();
 
   const handleOptionsChange = (newOptions: Partial<QuizOptions>) => {
     setOptions(prev => ({ ...prev, ...newOptions }));
@@ -45,9 +53,25 @@ export function QuizTool() {
     setIsAnswered(false);
     
     const model = modelOverrides.quiz || globalModel;
+    const provider = getProviderFromModel(model);
+    const apiKey = apiKeys[provider];
+
+     if (!apiKey) {
+        setError(`API key for ${provider} is not set. Please add it in Settings.`);
+        setIsLoading(false);
+        return;
+    }
 
     try {
-      const result = await handleGenerateQuiz({ summaryContent: text, model, options: { questionCount: options.questionCount, difficulty: options.difficulty } });
+      const result = await handleGenerateQuiz({ 
+          summaryContent: text, 
+          model, 
+          apiKey: { provider, key: apiKey },
+          options: { 
+              questionCount: options.questionCount, 
+              difficulty: options.difficulty 
+            } 
+        });
       setQuestions(result.questions);
       addRecent({
         title: text.substring(0, 30) + '...',

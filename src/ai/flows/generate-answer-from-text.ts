@@ -6,9 +6,14 @@
  * - GenerateAnswerFromTextOutput - The return type for the generateAnswerFromtext function.
  */
 
+'use server';
+
 import {z} from 'zod';
-import OpenAI from 'openai';
-import {GenerateAnswerFromTextInputSchema, GenerateAnswerFromTextOutputSchema} from './schemas';
+import {
+  GenerateAnswerFromTextInputSchema,
+  GenerateAnswerFromTextOutputSchema,
+} from './schemas';
+import { callGenerativeAI } from '../unified-ai-handler';
 
 export type GenerateAnswerFromTextInput = z.infer<
   typeof GenerateAnswerFromTextInputSchema
@@ -18,40 +23,26 @@ export type GenerateAnswerFromTextOutput = z.infer<
   typeof GenerateAnswerFromTextOutputSchema
 >;
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 export async function generateAnswerFromText(
   input: GenerateAnswerFromTextInput
 ): Promise<GenerateAnswerFromTextOutput> {
   try {
-    if (!process.env.OPENAI_API_KEY) {
-      throw new Error('Missing OPENAI_API_KEY in environment');
-    }
+    const systemPrompt = `You are a helpful AI assistant. Answer the user's question based on the provided conversation history. Respond in JSON format with a single key "answer".`;
+    
+    // Construct a single prompt from the history and the new question
+    const userPrompt = `History: ${JSON.stringify(input.history)}\n\nQuestion: ${input.text}`;
 
-    const response = await openai.chat.completions.create({
-      model: input.model || 'gpt-4',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a helpful AI assistant. Answer the user's question based on the provided conversation history. Respond in JSON format with a single key "answer".`,
-        },
-        { role: 'user', content: `History: ${JSON.stringify(input.history)}\n\nQuestion: ${input.text}` },
-      ],
-      temperature: 0.5,
-      response_format: { type: 'json_object' },
+    const result = await callGenerativeAI({
+        model: input.model,
+        apiKey: input.apiKey,
+        systemPrompt: systemPrompt,
+        userPrompt: userPrompt,
+        schema: GenerateAnswerFromTextOutputSchema,
     });
 
-    const content = response.choices[0].message?.content;
-    if (!content) {
-      throw new Error('No content returned from OpenAI API.');
-    }
-
-    const parsed = JSON.parse(content);
-    return parsed;
+    return result;
   } catch (error: any) {
-    console.error("Error generating answer:", error);
+    console.error('Error generating answer:', error);
     throw error;
   }
 }
