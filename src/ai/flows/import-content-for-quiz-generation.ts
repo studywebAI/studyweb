@@ -51,7 +51,9 @@ export async function importContentForQuizGeneration(
       throw new Error('No content returned from OpenAI API.');
     }
 
-    const parsed = ImportContentForQuizGenerationOutputSchema.parse(JSON.parse(content));
+    const parsed = JSON.parse(content);
+    // Validate with Zod, but return the parsed object directly
+    ImportContentForQuizGenerationOutputSchema.parse(parsed);
     return parsed;
 
   } catch (error: any) {

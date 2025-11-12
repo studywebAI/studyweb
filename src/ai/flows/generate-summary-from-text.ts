@@ -46,7 +46,9 @@ export async function generateSummaryFromText(
       throw new Error('No content returned from OpenAI API.');
     }
     
-    const parsed = GenerateSummaryFromTextOutputSchema.parse(JSON.parse(content));
+    const parsed = JSON.parse(content);
+    // Validate with Zod, but return the parsed object directly
+    GenerateSummaryFromTextOutputSchema.parse(parsed);
     return parsed;
 
   } catch (error: any) {

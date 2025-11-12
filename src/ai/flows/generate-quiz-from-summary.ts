@@ -55,7 +55,9 @@ export async function generateQuizFromSummary(
       throw new Error('No content returned from OpenAI API.');
     }
 
-    const parsed = GenerateQuizFromSummaryOutputSchema.parse(JSON.parse(content));
+    const parsed = JSON.parse(content);
+    // Validate with Zod, but return the parsed object directly
+    GenerateQuizFromSummaryOutputSchema.parse(parsed);
     return parsed;
 
   } catch (error: any) {

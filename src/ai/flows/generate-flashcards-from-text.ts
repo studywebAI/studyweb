@@ -52,7 +52,9 @@ export async function generateFlashcardsFromText(
       throw new Error('No content returned from OpenAI API.');
     }
 
-    const parsed = GenerateFlashcardsFromTextOutputSchema.parse(JSON.parse(content));
+    const parsed = JSON.parse(content);
+    // Validate with Zod, but return the parsed object directly
+    GenerateFlashcardsFromTextOutputSchema.parse(parsed);
     return parsed;
 
   } catch (error: any) {

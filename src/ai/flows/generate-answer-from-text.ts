@@ -48,7 +48,9 @@ export async function generateAnswerFromText(
       throw new Error('No content returned from OpenAI API.');
     }
 
-    const parsed = GenerateAnswerFromTextOutputSchema.parse(JSON.parse(content));
+    const parsed = JSON.parse(content);
+    // Validate with Zod, but return the parsed object directly
+    GenerateAnswerFromTextOutputSchema.parse(parsed);
     return parsed;
   } catch (error: any) {
     console.error("Error generating answer:", error);
