@@ -30,7 +30,7 @@ export function QuizTool() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
-  const { addRecent } = useApp();
+  const { addRecent, globalModel, modelOverrides } = useApp();
 
   const handleOptionsChange = (newOptions: Partial<QuizOptions>) => {
     setOptions(prev => ({ ...prev, ...newOptions }));
@@ -43,9 +43,11 @@ export function QuizTool() {
     setCurrentQuestionIndex(0);
     setSelectedAnswer(null);
     setIsAnswered(false);
+    
+    const model = modelOverrides.quiz || globalModel;
 
     try {
-      const result = await handleGenerateQuiz({ summaryContent: text, options: { questionCount: options.questionCount, difficulty: options.difficulty } });
+      const result = await handleGenerateQuiz({ summaryContent: text, model, options: { questionCount: options.questionCount, difficulty: options.difficulty } });
       setQuestions(result.questions);
       addRecent({
         title: text.substring(0, 30) + '...',

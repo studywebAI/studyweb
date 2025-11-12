@@ -5,6 +5,8 @@ import { handleGenerateAnswer } from '@/app/actions';
 import { Bot, User, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
+import { useApp } from '../app-provider';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 interface Message {
   role: 'user' | 'ai';
@@ -15,6 +17,8 @@ interface Message {
 export function AnswerTool() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { globalModel, modelOverrides } = useApp();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -25,15 +29,18 @@ export function AnswerTool() {
 
   const handleSubmit = async (text: string) => {
     setIsLoading(true);
+    setError(null);
     const newMessages: Message[] = [...messages, { role: 'user', content: text }];
     setMessages(newMessages);
 
     // Add a placeholder for AI response
     setMessages((prev) => [...prev, { role: 'ai', content: '', isStreaming: true }]);
 
+    const model = modelOverrides.answer || globalModel;
+
     try {
       const history = newMessages.filter(m => !m.isStreaming).map(m => ({role: m.role, content: m.content})) as {role: 'user' | 'ai', content: string}[];
-      const result = await handleGenerateAnswer({ text, history });
+      const result = await handleGenerateAnswer({ text, history, model });
       const fullText = result.answer;
 
       let currentText = '';
@@ -50,16 +57,11 @@ export function AnswerTool() {
         );
       }
 
-    } catch (error: any) {
-      const errorMessage = error.message || 'An unknown error occurred.';
-      console.error('Error generating answer:', error);
-      setMessages((prev) =>
-        prev.map((msg, index) =>
-          index === prev.length - 1
-            ? { ...msg, content: `Error: ${errorMessage}` }
-            : msg
-        )
-      );
+    } catch (e: any) {
+      const errorMessage = e.message || 'An unknown error occurred.';
+      console.error('Error generating answer:', e);
+      setMessages(prev => prev.slice(0, -1)); // Remove placeholder
+      setError(errorMessage);
     } finally {
       setMessages((prev) =>
         prev.map((msg) =>
@@ -86,7 +88,13 @@ export function AnswerTool() {
     <div className="flex h-screen flex-col bg-background">
       <div className="flex-grow overflow-y-auto p-4 md:p-6">
         <div className="mx-auto max-w-3xl space-y-6">
-          {messages.length === 0 && !isLoading && <WelcomeScreen />}
+          {error && (
+            <Alert variant="destructive">
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          {messages.length === 0 && !isLoading && !error && <WelcomeScreen />}
           {messages.map((msg, i) => (
             <div
               key={i}

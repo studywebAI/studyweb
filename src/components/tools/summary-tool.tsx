@@ -27,7 +27,7 @@ export function SummaryTool() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { addRecent } = useApp();
+  const { addRecent, globalModel, modelOverrides } = useApp();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -45,9 +45,11 @@ export function SummaryTool() {
     setError(null);
     setMessages((prev) => [...prev, { role: 'user', content: text }]);
     setMessages((prev) => [...prev, { role: 'ai', content: '', isStreaming: true }]);
+    
+    const model = modelOverrides.summary || globalModel;
 
     try {
-      const result = await handleGenerateSummary({ text });
+      const result = await handleGenerateSummary({ text, model });
       let fullText = result.summary;
 
       const tldr = "TL;DR: " + fullText.split('.').slice(0, 1).join('.') + ".";
@@ -88,14 +90,8 @@ export function SummaryTool() {
     } catch (e: any) {
       console.error('Error generating summary:', e);
        const errorMessage = e.message || 'An unknown error occurred.';
+      setMessages(prev => prev.slice(0, -1)); // Remove the streaming placeholder
       setError(errorMessage);
-      setMessages((prev) =>
-        prev.map((msg, index) =>
-          index === prev.length - 1
-            ? { ...msg, content: `Error: ${errorMessage}`, isStreaming: false }
-            : msg
-        )
-      );
     } finally {
       setMessages((prev) =>
         prev.map((msg) =>
@@ -127,7 +123,13 @@ export function SummaryTool() {
       />
       <div className="flex-grow overflow-y-auto p-4 md:p-6">
         <div className="mx-auto max-w-3xl space-y-6">
-          {messages.length === 0 && !isLoading && <WelcomeScreen />}
+          {error && (
+            <Alert variant="destructive">
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          {messages.length === 0 && !isLoading && !error && <WelcomeScreen />}
           {messages.map((msg, i) => (
             <div
               key={i}

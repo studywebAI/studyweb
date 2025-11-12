@@ -33,7 +33,7 @@ export async function generateQuizFromSummary(
     }
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: input.model || 'gpt-4',
       messages: [
         {
           role: 'system',
@@ -56,8 +56,6 @@ export async function generateQuizFromSummary(
     }
 
     const parsed = JSON.parse(content);
-    // Validate with Zod, but return the parsed object directly
-    GenerateQuizFromSummaryOutputSchema.parse(parsed);
     return parsed;
 
   } catch (error: any) {

@@ -29,6 +29,7 @@ import type { Tool } from './app-provider';
 import { useApp } from './app-provider';
 import { cn } from '@/lib/utils';
 import { AuthDialog } from './auth-dialog';
+import { SettingsDialog } from './settings-dialog';
 import { Skeleton } from './ui/skeleton';
 
 
@@ -48,6 +49,7 @@ export function AppSidebar({ activeTool, setActiveTool }: AppSidebarProps) {
   const { recents, user, isAuthLoading } = useApp();
   const { state } = useSidebar();
   const [isAuthDialogOpen, setAuthDialogOpen] = useState(false);
+  const [isSettingsOpen, setSettingsOpen] = useState(false);
   
   const AuthContent = () => {
     if (isAuthLoading) {
@@ -134,7 +136,7 @@ export function AppSidebar({ activeTool, setActiveTool }: AppSidebarProps) {
              {/* This is intentionally not shown yet per instructions */}
              {/* <AuthContent /> */}
             <SidebarMenuItem>
-              <SidebarMenuButton tooltip={{ children: 'Settings', side: 'right' }}>
+              <SidebarMenuButton onClick={() => setSettingsOpen(true)} tooltip={{ children: 'Settings', side: 'right' }}>
                 <Settings />
                 <span>Settings</span>
               </SidebarMenuButton>
@@ -146,6 +148,7 @@ export function AppSidebar({ activeTool, setActiveTool }: AppSidebarProps) {
         </SidebarFooter>
       </Sidebar>
       <AuthDialog open={isAuthDialogOpen} onOpenChange={setAuthDialogOpen} />
+      <SettingsDialog open={isSettingsOpen} onOpenChange={setSettingsOpen} />
     </>
   );
 }

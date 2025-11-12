@@ -29,7 +29,7 @@ export function FlashcardsTool() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sourceText, setSourceText] = useState('');
-  const { addRecent } = useApp();
+  const { addRecent, globalModel, modelOverrides } = useApp();
 
   const handleOptionsChange = (newOptions: Partial<FlashcardOptions>) => {
     setOptions((prev) => ({ ...prev, ...newOptions }));
@@ -40,8 +40,11 @@ export function FlashcardsTool() {
     setFlashcards([]);
     setError(null);
     setSourceText(text);
+
+    const model = modelOverrides.flashcards || globalModel;
+
     try {
-      const result = await handleGenerateFlashcards({ text });
+      const result = await handleGenerateFlashcards({ text, model });
       setFlashcards(result.cards);
       addRecent({
         title: text.substring(0, 30) + '...',

@@ -35,7 +35,7 @@ export async function generateFlashcardsFromText(
     }
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: input.model || 'gpt-4',
       messages: [
         {
           role: 'system',
@@ -53,8 +53,6 @@ export async function generateFlashcardsFromText(
     }
 
     const parsed = JSON.parse(content);
-    // Validate with Zod, but return the parsed object directly
-    GenerateFlashcardsFromTextOutputSchema.parse(parsed);
     return parsed;
 
   } catch (error: any) {

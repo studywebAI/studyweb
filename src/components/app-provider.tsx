@@ -22,11 +22,18 @@ interface AppContextType {
   user: User | null;
   session: Session | null;
   isAuthLoading: boolean;
+  globalModel: string;
+  setGlobalModel: (model: string) => void;
+  modelOverrides: { [key in Tool]?: string };
+  setModelOverride: (tool: Tool, model: string) => void;
+  clearModelOverride: (tool: Tool) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_KEY = 'studygenius_recents';
+const LOCAL_STORAGE_KEY_RECENTS = 'studygenius_recents';
+const LOCAL_STORAGE_KEY_MODELS = 'studygenius_models';
+
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [activeTool, setActiveTool] = useState<Tool>('summary');
@@ -34,6 +41,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+
+  // Model selection state
+  const [globalModel, setGlobalModel] = useState('gpt-4o-mini');
+  const [modelOverrides, setModelOverrides] = useState<{ [key in Tool]?: string }>({});
+
+
+  // Load models from localStorage on initial render
+  useEffect(() => {
+    const savedModels = localStorage.getItem(LOCAL_STORAGE_KEY_MODELS);
+    if (savedModels) {
+      const { globalModel: savedGlobal, overrides } = JSON.parse(savedModels);
+      if (savedGlobal) setGlobalModel(savedGlobal);
+      if (overrides) setModelOverrides(overrides);
+    }
+  }, []);
+
+  // Save models to localStorage whenever they change
+  useEffect(() => {
+    const modelsToSave = { globalModel, overrides: modelOverrides };
+    localStorage.setItem(LOCAL_STORAGE_KEY_MODELS, JSON.stringify(modelsToSave));
+  }, [globalModel, modelOverrides]);
+
+  const handleSetModelOverride = (tool: Tool, model: string) => {
+    setModelOverrides(prev => ({...prev, [tool]: model}));
+  }
+
+  const handleClearModelOverride = (tool: Tool) => {
+    setModelOverrides(prev => {
+        const newOverrides = {...prev};
+        delete newOverrides[tool];
+        return newOverrides;
+    });
+  }
+
 
   // Handle auth state changes and initial load
   useEffect(() => {
@@ -47,7 +88,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           // TODO: Fetch data from Supabase
         } else {
           // Load from localStorage for guests
-          const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
+          const localData = localStorage.getItem(LOCAL_STORAGE_KEY_RECENTS);
           setRecents(localData ? JSON.parse(localData) : []);
         }
         setIsAuthLoading(false);
@@ -59,7 +100,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         if (!session) {
-             const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
+             const localData = localStorage.getItem(LOCAL_STORAGE_KEY_RECENTS);
              setRecents(localData ? JSON.parse(localData) : []);
         }
         setIsAuthLoading(false);
@@ -73,7 +114,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // Update localStorage whenever recents change for a guest user
   useEffect(() => {
     if (!user) {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(recents));
+      localStorage.setItem(LOCAL_STORAGE_KEY_RECENTS, JSON.stringify(recents));
     }
   }, [recents, user]);
 
@@ -93,8 +134,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
   
+  const appContextValue: AppContextType = {
+    activeTool,
+    setActiveTool,
+    recents,
+    addRecent,
+    user,
+    session,
+    isAuthLoading,
+    globalModel,
+    setGlobalModel,
+    modelOverrides,
+    setModelOverride: handleSetModelOverride,
+    clearModelOverride: handleClearModelOverride,
+  };
+
   return (
-    <AppContext.Provider value={{ activeTool, setActiveTool, recents, addRecent, user, session, isAuthLoading }}>
+    <AppContext.Provider value={appContextValue}>
       {children}
     </AppContext.Provider>
   );

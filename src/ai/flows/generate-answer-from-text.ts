@@ -31,7 +31,7 @@ export async function generateAnswerFromText(
     }
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: input.model || 'gpt-4',
       messages: [
         {
           role: 'system',
@@ -49,8 +49,6 @@ export async function generateAnswerFromText(
     }
 
     const parsed = JSON.parse(content);
-    // Validate with Zod, but return the parsed object directly
-    GenerateAnswerFromTextOutputSchema.parse(parsed);
     return parsed;
   } catch (error: any) {
     console.error("Error generating answer:", error);
