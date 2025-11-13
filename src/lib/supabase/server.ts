@@ -1,7 +1,8 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { type NextRequest } from 'next/server'
 
-export function createClient() {
+export function createClient(request?: NextRequest) {
   const cookieStore = cookies()
 
   return createServerClient(

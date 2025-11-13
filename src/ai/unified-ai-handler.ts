@@ -54,7 +54,7 @@ async function callAI<T extends z.ZodType<any, any>>(
 // A wrapper to handle retries with a fallback key.
 async function callWithRetry<T extends z.ZodType<any, any>>(
     provider: 'openai' | 'google',
-    keys: (string | undefined)[],
+    keys: (string | undefined)[] | (string | null)[] ,
     model: string,
     systemPrompt: string,
     userPrompt: string,
@@ -93,24 +93,26 @@ export async function callGenerativeAI<T extends z.ZodType<any, any>>(
 
   const provider = getProviderFromModel(model);
 
-  // If a user-specific API key is provided in the settings, use it directly without rotation.
-  if (apiKey?.key) {
-    console.log(`Using user-provided API key for ${provider}.`);
-    return callAI(provider, apiKey.key, model, systemPrompt, userPrompt, schema);
-  }
-  
-  // Otherwise, use the server's environment keys with the retry/rotation logic.
-  console.log(`Using server-provided API keys for ${provider} with rotation.`);
-  const envKeys = provider === 'openai' 
-    ? [process.env.OPENAI_API_KEY_1, process.env.OPENAI_API_KEY]
-    : [process.env.GEMINI_API_KEY_1, process.env.GEMINI_API_KEY];
+  // Prepare a list of keys to try, starting with the user-provided key (if any).
+  const keysToTry = [apiKey?.key];
 
-  const availableKeys = envKeys.filter(Boolean);
+  // Add server-side environment keys as fallbacks.
+  if (provider === 'openai') {
+    keysToTry.push(process.env.OPENAI_API_KEY);
+    keysToTry.push(process.env.OPENAI_API_KEY_1);
+  } else {
+    keysToTry.push(process.env.GEMINI_API_KEY);
+    keysToTry.push(process.env.GEMINI_API_KEY_1);
+  }
+
+  // Filter out any undefined/empty keys
+  const availableKeys = keysToTry.filter(Boolean);
 
   if (availableKeys.length === 0) {
-      throw new Error(`No server-side API keys configured for ${provider}. Please add them to the .env file.`);
+    throw new Error(`No API keys configured for ${provider}. Please add one in settings or in the server .env file.`);
   }
 
+  console.log(`Attempting to call ${provider} with ${availableKeys.length} available keys.`);
   return callWithRetry(provider, availableKeys, model, systemPrompt, userPrompt, schema);
 }
 

@@ -57,17 +57,25 @@ export function AppProvider({ children, supabaseUrl, supabaseAnonKey }: AppProvi
   // Model selection state
   const [globalModel, setGlobalModel] = useState('gpt-4o-mini');
   const [modelOverrides, setModelOverrides] = useState<{ [key in Tool]?: string }>({});
-  const [apiKeys, setApiKeys] = useState({ openai: '', google: ''});
+  const [apiKeys, setApiKeys] = useState({
+    openai: process.env.NEXT_PUBLIC_OPENAI_API_KEY || '',
+    google: process.env.NEXT_PUBLIC_GOOGLE_API_KEY || ''
+  });
 
 
   // Load settings from localStorage on initial render
   useEffect(() => {
     const savedSettings = localStorage.getItem(LOCAL_STORAGE_KEY_SETTINGS);
     if (savedSettings) {
-      const { globalModel: savedGlobal, overrides, keys } = JSON.parse(savedSettings);
+      const { globalModel: savedGlobal, overrides, keys: savedKeys } = JSON.parse(savedSettings);
       if (savedGlobal) setGlobalModel(savedGlobal);
       if (overrides) setModelOverrides(overrides);
-      if (keys) setApiKeys(keys);
+      if (savedKeys) {
+        setApiKeys(prev => ({
+          openai: savedKeys.openai || prev.openai,
+          google: savedKeys.google || prev.google,
+        }));
+      }
     }
   }, []);
 
