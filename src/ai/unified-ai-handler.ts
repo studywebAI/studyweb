@@ -51,19 +51,22 @@ async function callAI<T extends z.ZodType<any, any>>(
 }
 
 
-// A wrapper to handle retries with a fallback key.
+// A wrapper to handle retries with fallback keys.
 async function callWithRetry<T extends z.ZodType<any, any>>(
     provider: 'openai' | 'google',
-    keys: (string | undefined)[] | (string | null)[] ,
+    keys: (string | undefined)[],
     model: string,
     systemPrompt: string,
     userPrompt: string,
     schema: T
 ): Promise<z.infer<T>> {
-    let lastError: any = new Error(`No API keys provided for ${provider}.`);
+    let lastError: any = new Error(`No valid API keys were available to try for ${provider}.`);
     
     for (const key of keys) {
-        if (!key) continue;
+        if (!key || key.includes('YOUR_') || key.length < 10) {
+            console.warn(`Skipping invalid or placeholder API key.`);
+            continue;
+        };
         
         try {
             return await callAI(provider, key, model, systemPrompt, userPrompt, schema);
@@ -72,11 +75,11 @@ async function callWithRetry<T extends z.ZodType<any, any>>(
             lastError = error;
 
             // Check if the error is a quota/authentication error to justify a retry
-            const isQuotaError = (error instanceof OpenAI.APIError && (error.status === 429 || error.status === 401)) ||
-                                 (error instanceof GoogleGenerativeAIError && (error.message.includes('QUOTA') || error.message.includes('API_KEY')));
+            const isRetryableError = (error instanceof OpenAI.APIError && (error.status === 429 || error.status === 401)) ||
+                                   (error instanceof GoogleGenerativeAIError && (error.message.includes('QUOTA') || error.message.includes('API_KEY_INVALID')));
 
-            if (!isQuotaError) {
-                // If it's not a quota error, don't retry with another key as it's likely a different issue.
+            if (!isRetryableError) {
+                // If it's not a retryable error (e.g. bad request), don't try another key.
                 throw error;
             }
         }
@@ -94,7 +97,7 @@ export async function callGenerativeAI<T extends z.ZodType<any, any>>(
   const provider = getProviderFromModel(model);
 
   // Prepare a list of keys to try, starting with the user-provided key (if any).
-  const keysToTry = [apiKey?.key];
+  const keysToTry: (string | undefined)[] = [apiKey?.key];
 
   // Add server-side environment keys as fallbacks.
   if (provider === 'openai') {
@@ -105,14 +108,14 @@ export async function callGenerativeAI<T extends z.ZodType<any, any>>(
     keysToTry.push(process.env.GEMINI_API_KEY_1);
   }
 
-  // Filter out any undefined/empty keys
-  const availableKeys = keysToTry.filter(Boolean);
+  // Filter out any undefined/empty/null keys before passing to the retry function.
+  const availableKeys = keysToTry.filter(k => k);
 
   if (availableKeys.length === 0) {
     throw new Error(`No API keys configured for ${provider}. Please add one in settings or in the server .env file.`);
   }
 
-  console.log(`Attempting to call ${provider} with ${availableKeys.length} available keys.`);
+  console.log(`Attempting to call ${provider} with up to ${availableKeys.length} available keys.`);
   return callWithRetry(provider, availableKeys, model, systemPrompt, userPrompt, schema);
 }
 
@@ -164,8 +167,22 @@ async function callGoogleAI<T extends z.ZodType<any, any>>(
 
     // Gemini doesn't have a native JSON mode like OpenAI, so we need to instruct it
     // and then parse the markdown-formatted JSON from the response.
-    const jsonText = text.replace(/^```json\n/, '').replace(/\n```$/, '');
+    let jsonText = text.replace(/^```json\n/, '').replace(/\n```$/, '');
 
-    const parsedContent = JSON.parse(jsonText);
-    return schema.parse(parsedContent);
+    // Handle cases where the model might not wrap the JSON in markdown
+    if (!jsonText.startsWith('{') && !jsonText.startsWith('[')) {
+        const jsonStartIndex = jsonText.indexOf('{');
+        const jsonEndIndex = jsonText.lastIndexOf('}');
+        if (jsonStartIndex !== -1 && jsonEndIndex !== -1) {
+            jsonText = jsonText.substring(jsonStartIndex, jsonEndIndex + 1);
+        }
+    }
+
+    try {
+        const parsedContent = JSON.parse(jsonText);
+        return schema.parse(parsedContent);
+    } catch (e) {
+        console.error("Failed to parse JSON from Gemini response:", jsonText);
+        throw new Error("The AI returned a response that was not valid JSON.");
+    }
 }
