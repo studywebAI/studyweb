@@ -20,6 +20,10 @@ import {
     gradeAnswer,
     type GradeAnswerInput,
 } from '@/ai/flows/grade-answer';
+import {
+    generateHintForCard,
+    type GenerateHintInput,
+} from '@/ai/flows/generate-hint-for-card';
 
 export async function handleGenerateSummary(input: GenerateSummaryFromTextInput) {
   try {
@@ -62,6 +66,15 @@ export async function handleGradeAnswer(input: GradeAnswerInput) {
     try {
         return await gradeAnswer(input);
     } catch (e: any)        {
+        console.error('Server action error:', e);
+        throw e;
+    }
+}
+
+export async function handleGenerateHint(input: GenerateHintInput) {
+    try {
+        return await generateHintForCard(input);
+    } catch (e: any) {
         console.error('Server action error:', e);
         throw e;
     }

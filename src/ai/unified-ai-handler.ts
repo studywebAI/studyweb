@@ -54,7 +54,7 @@ async function callAI<T extends z.ZodType<any, any>>(
 // A wrapper to handle retries with fallback keys.
 async function callWithRetry<T extends z.ZodType<any, any>>(
     provider: 'openai' | 'google',
-    keys: (string | undefined)[],
+    keys: (string | undefined | null)[] ,
     model: string,
     systemPrompt: string,
     userPrompt: string,
@@ -97,22 +97,23 @@ export async function callGenerativeAI<T extends z.ZodType<any, any>>(
   const provider = getProviderFromModel(model);
 
   // Prepare a list of keys to try, starting with the user-provided key (if any).
-  const keysToTry: (string | undefined)[] = [apiKey?.key];
+  const keysToTry: (string | undefined | null)[] = [apiKey?.key];
 
-  // Add server-side environment keys as fallbacks.
+  // Add server-side environment keys as fallbacks, with rotation.
   if (provider === 'openai') {
     keysToTry.push(process.env.OPENAI_API_KEY);
-    keysToTry.push(process.env.OPENAI_API_KEY_1);
+    keysToTry.push(process.env.OPENAI_API_KEY_2);
   } else {
     keysToTry.push(process.env.GEMINI_API_KEY);
-    keysToTry.push(process.env.GEMINI_API_KEY_1);
+    keysToTry.push(process.env.GEMINI_API_KEY_2);
   }
 
-  // Filter out any undefined/empty/null keys before passing to the retry function.
-  const availableKeys = keysToTry.filter(k => k);
+  // Filter out any undefined/empty/placeholder keys
+  const availableKeys = keysToTry.filter(k => k && !k.includes('YOUR_') && k.length > 10);
+
 
   if (availableKeys.length === 0) {
-    throw new Error(`No API keys configured for ${provider}. Please add one in settings or in the server .env file.`);
+    throw new Error(`No valid API keys were available to try for ${provider}. Please add one in settings or in the server .env file.`);
   }
 
   console.log(`Attempting to call ${provider} with up to ${availableKeys.length} available keys.`);

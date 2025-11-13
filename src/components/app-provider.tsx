@@ -1,290 +1,180 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import type { Session, User, SupabaseClient } from '@supabase/supabase-js';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useMemo } from 'react';
+import { createClient, SupabaseClient, Session } from '@supabase/supabase-js';
+import { useToast } from '@/hooks/use-toast';
 
-export type Tool = 'summary' | 'quiz' | 'flashcards' | 'answer';
+// --- Types ---
+export type StudyTool = 'summary' | 'flashcards' | 'quiz' | 'answer';
 
 export interface StudySession {
   id: string;
-  type: 'summary' | 'quiz' | 'flashcards';
+  user_id: string;
+  created_at: string;
   title: string;
-  content: any; // Can be string for summary, object for quiz/flashcards
-  createdAt: number;
-  updatedAt: number;
-  isSynced: boolean;
-  userId?: string;
+  type: StudyTool;
+  source_text: string; // The original text used to generate the content
+  content: any; // JSONB content (e.g., { cards: [...] } or { questions: [...] } or "summary text")
+}
+
+export type GlobalModel = 'gpt-4o' | 'gpt-4-turbo' | 'gemini-1.5-pro-latest' | 'gemini-1.5-flash-latest';
+
+export interface ModelOverrides {
+  summary: GlobalModel | null;
+  flashcards: GlobalModel | null;
+  quiz: GlobalModel | null;
+  answer: GlobalModel | null;
+}
+
+export interface ApiKeys {
+  openai: string | null;
+  google: string | null;
 }
 
 interface AppContextType {
-  activeTool: Tool;
-  setActiveTool: (tool: Tool) => void;
-  sessions: StudySession[];
-  addSession: (item: Omit<StudySession, 'id' | 'createdAt' | 'updatedAt' | 'isSynced'>) => void;
-  user: User | null;
-  session: Session | null;
-  isAuthLoading: boolean;
-  globalModel: string;
-  setGlobalModel: (model: string) => void;
-  modelOverrides: { [key in Tool]?: string };
-  setModelOverride: (tool: Tool, model: string) => void;
-  clearModelOverride: (tool: Tool) => void;
-  apiKeys: { openai: string; google: string; };
-  setApiKey: (provider: 'openai' | 'google', key: string) => void;
   supabase: SupabaseClient;
+  session: Session | null;
+  sessions: StudySession[];
+  addSession: (sessionData: Omit<StudySession, 'id' | 'user_id' | 'created_at'>) => Promise<void>;
+  deleteSession: (id: string) => Promise<void>;
+  globalModel: GlobalModel;
+  setGlobalModel: (model: GlobalModel) => void;
+  modelOverrides: ModelOverrides;
+  setModelOverrides: (overrides: Partial<ModelOverrides>) => void;
+  apiKeys: ApiKeys;
+  setApiKeys: (keys: Partial<ApiKeys>) => void;
+  activeTool: StudyTool;
+  setActiveTool: (tool: StudyTool) => void;
+  isSettingsLoaded: boolean;
 }
 
+// --- Context ---
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_KEY_SESSIONS = 'studygenius_sessions';
-const LOCAL_STORAGE_KEY_SETTINGS = 'studygenius_settings';
+// --- Provider ---
+export function AppProvider({ children }: { children: ReactNode }) {
+  const [supabase] = useState(() => 
+    createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+  );
 
-interface AppProviderProps {
-  children: React.ReactNode;
-  supabaseUrl: string;
-  supabaseAnonKey: string;
-}
-
-export function AppProvider({ children, supabaseUrl, supabaseAnonKey }: AppProviderProps) {
-  const [supabase] = useState(() => createClient(supabaseUrl, supabaseAnonKey));
-  const [activeTool, setActiveTool] = useState<Tool>('summary');
-  const [sessions, setSessions] = useState<StudySession[]>([]);
   const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [sessions, setSessions] = useState<StudySession[]>([]);
+  const { toast } = useToast();
+  
+  const [activeTool, setActiveTool] = useState<StudyTool>('summary');
 
-  // Model selection state
-  const [globalModel, setGlobalModel] = useState('gpt-4o-mini');
-  const [modelOverrides, setModelOverrides] = useState<{ [key in Tool]?: string }>({});
-  const [apiKeys, setApiKeys] = useState({
-    openai: process.env.NEXT_PUBLIC_OPENAI_API_KEY || '',
-    google: process.env.NEXT_PUBLIC_GOOGLE_API_KEY || ''
-  });
+  // State for settings
+  const [globalModel, setGlobalModel] = useState<GlobalModel>('gemini-1.5-flash-latest');
+  const [modelOverrides, setModelOverrides] = useState<ModelOverrides>({ summary: null, flashcards: null, quiz: null, answer: null });
+  const [apiKeys, setApiKeys] = useState<ApiKeys>({ openai: null, google: null });
+  const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
 
-
-  // Load settings from localStorage on initial render
+  
+  // --- Effects ---
   useEffect(() => {
-    const savedSettings = localStorage.getItem(LOCAL_STORAGE_KEY_SETTINGS);
-    if (savedSettings) {
-      const { globalModel: savedGlobal, overrides, keys: savedKeys } = JSON.parse(savedSettings);
-      if (savedGlobal) setGlobalModel(savedGlobal);
-      if (overrides) setModelOverrides(overrides);
-      if (savedKeys) {
-        setApiKeys(prev => ({
-          openai: savedKeys.openai || prev.openai,
-          google: savedKeys.google || prev.google,
-        }));
-      }
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+    return () => authListener.subscription.unsubscribe();
+  }, [supabase]);
+
+  useEffect(() => {
+    if (session) {
+      fetchSessions();
+    }
+  }, [session]);
+
+  // Load settings from localStorage on client-side mount
+  useEffect(() => {
+    try {
+        const savedGlobalModel = localStorage.getItem('globalModel');
+        if (savedGlobalModel) setGlobalModel(savedGlobalModel as GlobalModel);
+
+        const savedModelOverrides = localStorage.getItem('modelOverrides');
+        if (savedModelOverrides) setModelOverrides(JSON.parse(savedModelOverrides));
+
+        const savedApiKeys = localStorage.getItem('apiKeys');
+        if (savedApiKeys) setApiKeys(JSON.parse(savedApiKeys));
+
+    } catch (error) {
+        console.error("Failed to load settings from localStorage", error);
+        toast({ title: "Could not load settings", description: "Your settings from a previous session could not be loaded.", variant: "destructive" });
+    } finally {
+        setIsSettingsLoaded(true);
     }
   }, []);
 
-  // Save settings to localStorage whenever they change
-  useEffect(() => {
-    const settingsToSave = { 
-        globalModel, 
-        overrides: modelOverrides,
-        keys: apiKeys
-    };
-    localStorage.setItem(LOCAL_STORAGE_KEY_SETTINGS, JSON.stringify(settingsToSave));
-  }, [globalModel, modelOverrides, apiKeys]);
+  // Save settings to localStorage when they change
+  useEffect(() => { if(isSettingsLoaded) localStorage.setItem('globalModel', globalModel); }, [globalModel, isSettingsLoaded]);
+  useEffect(() => { if(isSettingsLoaded) localStorage.setItem('modelOverrides', JSON.stringify(modelOverrides)); }, [modelOverrides, isSettingsLoaded]);
+  useEffect(() => { if(isSettingsLoaded) localStorage.setItem('apiKeys', JSON.stringify(apiKeys)); }, [apiKeys, isSettingsLoaded]);
 
-  const handleSetModelOverride = (tool: Tool, model: string) => {
-    setModelOverrides(prev => ({...prev, [tool]: model}));
-  }
-
-  const handleClearModelOverride = (tool: Tool) => {
-    setModelOverrides(prev => {
-        const newOverrides = {...prev};
-        delete newOverrides[tool];
-        return newOverrides;
-    });
-  }
-
-  const setApiKey = (provider: 'openai' | 'google', key: string) => {
-    setApiKeys(prev => ({...prev, [provider]: key}));
-  };
-
-  // Sync local data to Supabase
-  const syncLocalData = async (userId: string) => {
-    const localData = localStorage.getItem(LOCAL_STORAGE_KEY_SESSIONS);
-    if (!localData) return;
-
-    let localSessions: StudySession[] = JSON.parse(localData);
-    const unsyncedSessions = localSessions.filter(s => !s.isSynced);
-
-    if (unsyncedSessions.length > 0) {
-        console.log(`Found ${unsyncedSessions.length} unsynced sessions. Uploading...`);
-        const sessionsToUpload = unsyncedSessions.map(s => ({
-            id: s.id,
-            user_id: userId,
-            type: s.type,
-            title: s.title,
-            content: s.content,
-            created_at: new Date(s.createdAt).toISOString(),
-            updated_at: new Date(s.updatedAt).toISOString(),
-        }));
-        
-        const { error } = await supabase.from('sessions').upsert(sessionsToUpload);
-
-        if (error) {
-            console.error("Error syncing data to Supabase:", error);
-            // Do not clear local data if sync fails
-        } else {
-            console.log("Successfully synced local data.");
-            // Sync was successful, so we can clear the now-synced data from local storage.
-            // We keep sessions that belong to another user or are still unsynced for some reason.
-            const remainingLocalSessions = localSessions.filter(s => s.isSynced || !unsyncedSessions.some(us => us.id === s.id));
-            if (remainingLocalSessions.length > 0) {
-                 localStorage.setItem(LOCAL_STORAGE_KEY_SESSIONS, JSON.stringify(remainingLocalSessions));
-            } else {
-                 localStorage.removeItem(LOCAL_STORAGE_KEY_SESSIONS);
-            }
-        }
-    }
-  }
-
-  // Fetch data from Supabase for a logged-in user
-  const fetchSupabaseData = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('sessions')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-        console.error("Error fetching supabase data:", error);
-        return [];
-    }
-    
-    // Map from snake_case to camelCase
-    return data.map(item => ({
-        id: item.id,
-        type: item.type,
-        title: item.title,
-        content: item.content,
-        createdAt: new Date(item.created_at).getTime(),
-        updatedAt: new Date(item.updated_at).getTime(),
-        isSynced: true, // Data from Supabase is always considered synced
-        userId: item.user_id,
-    }));
-  }
-
-
-  // Handle auth state changes and initial load
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setIsAuthLoading(true);
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
-        setSession(session);
-        
-        if (currentUser) {
-          // User is logged in
-          await syncLocalData(currentUser.id);
-          const supabaseSessions = await fetchSupabaseData(currentUser.id);
-          
-          // After syncing and fetching, the Supabase data is the source of truth
-          setSessions(supabaseSessions);
-        } else {
-          // User is logged out, load from localStorage for guests
-          const localData = localStorage.getItem(LOCAL_STORAGE_KEY_SESSIONS);
-          setSessions(localData ? JSON.parse(localData) : []);
-        }
-        setIsAuthLoading(false);
-      }
-    );
-
-    // Initial load check
-    const checkInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      const currentUser = session?.user ?? null;
-
-      if (currentUser) {
-        const supabaseSessions = await fetchSupabaseData(currentUser.id);
-        setSessions(supabaseSessions);
-      } else {
-        const localData = localStorage.getItem(LOCAL_STORAGE_KEY_SESSIONS);
-        setSessions(localData ? JSON.parse(localData) : []);
-      }
-      setUser(currentUser);
-      setSession(session);
-      setIsAuthLoading(false);
-    }
-    
-    checkInitialSession();
-
-    return () => {
-      subscription?.unsubscribe();
-    };
-  }, [supabase]);
-
-  // Update localStorage whenever sessions change for a guest user
-  useEffect(() => {
-    if (!user && !isAuthLoading) {
-      localStorage.setItem(LOCAL_STORAGE_KEY_SESSIONS, JSON.stringify(sessions));
-    }
-  }, [sessions, user, isAuthLoading]);
-
-  const addSession = async (item: Omit<StudySession, 'id' | 'createdAt' | 'updatedAt' | 'isSynced'>) => {
-    const now = Date.now();
-    const newSession: StudySession = {
-      ...item,
-      id: crypto.randomUUID(),
-      createdAt: now,
-      updatedAt: now,
-      isSynced: false, // Start as not synced
-      userId: user?.id,
-    };
-    
-    setSessions(prev => [newSession, ...prev]);
-    
-    if (user) {
-        const { error } = await supabase.from('sessions').insert({
-            id: newSession.id,
-            user_id: user.id,
-            type: newSession.type,
-            title: newSession.title,
-            content: newSession.content,
-            created_at: new Date(newSession.createdAt).toISOString(),
-            updated_at: new Date(newSession.updatedAt).toISOString(),
-        });
-        if(error) {
-            console.error("Error saving session to Supabase:", error);
-            // The session remains in the state with isSynced: false, will be retried on next login.
-        } else {
-            // If save is successful, update the session in the state to be synced.
-            setSessions(prev => prev.map(s => s.id === newSession.id ? {...s, isSynced: true} : s));
-        }
+  // --- Data Functions ---
+  const fetchSessions = async () => {
+    if (!session) return;
+    try {
+      const { data, error } = await supabase
+        .from('sessions')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setSessions(data || []);
+    } catch (error: any) {
+      console.error('Error fetching sessions:', error);
+      toast({ title: "Error", description: "Could not fetch your saved sessions.", variant: "destructive" });
     }
   };
-  
-  const appContextValue: AppContextType = {
-    activeTool,
-    setActiveTool,
+
+  const addSession = async (sessionData: Omit<StudySession, 'id' | 'user_id' | 'created_at'>) => {
+    if (!session) return;
+    try {
+      const { data, error } = await supabase
+        .from('sessions')
+        .insert([{ ...sessionData, user_id: session.user.id }])
+        .select();
+      if (error) throw error;
+      if (data) {
+        setSessions(prev => [data[0], ...prev]);
+      }
+    } catch (error: any) {
+      console.error('Error adding session:', error);
+      toast({ title: "Error", description: "Could not save your session.", variant: "destructive" });
+    }
+  };
+
+  const deleteSession = async (id: string) => {
+    try {
+        const { error } = await supabase.from('sessions').delete().match({ id });
+        if (error) throw error;
+        setSessions(prev => prev.filter(s => s.id !== id));
+    } catch (error: any) {
+        console.error('Error deleting session:', error);
+        toast({ title: "Error", description: "Could not delete session.", variant: "destructive" });
+    }
+  };
+
+  // --- Memoized Value ---
+  const value = useMemo(() => ({
+    supabase,
+    session,
     sessions,
     addSession,
-    user,
-    session,
-    isAuthLoading,
+    deleteSession,
     globalModel,
     setGlobalModel,
     modelOverrides,
-    setModelOverride: handleSetModelOverride,
-    clearModelOverride: handleClearModelOverride,
+    setModelOverrides,
     apiKeys,
-    setApiKey,
-    supabase,
-  };
+    setApiKeys,
+    activeTool,
+    setActiveTool,
+    isSettingsLoaded
+  }), [supabase, session, sessions, globalModel, modelOverrides, apiKeys, activeTool, isSettingsLoaded]);
 
-  return (
-    <AppContext.Provider value={appContextValue}>
-      {children}
-    </AppContext.Provider>
-  );
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 
+// --- Hook ---
 export function useApp() {
   const context = useContext(AppContext);
   if (context === undefined) {

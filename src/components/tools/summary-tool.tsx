@@ -3,10 +3,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ToolOptionsBar, type SummaryOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
 import { handleGenerateSummary } from '@/app/actions';
-import { Bot, User, FileText, Printer, Download } from 'lucide-react';
+import { Bot, User, FileText, Printer, Download, Loader2 } from 'lucide-react';
 import { cn, downloadFile } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
-import { useApp } from '../app-provider';
+import { useApp, type StudySession } from '../app-provider';
 import Markdown from 'react-markdown';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Button } from '../ui/button';
@@ -37,7 +37,7 @@ export function SummaryTool() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { addSession, globalModel, modelOverrides, apiKeys } = useApp();
+  const { addSession, globalModel, modelOverrides, apiKeys, isSettingsLoaded } = useApp();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -56,6 +56,10 @@ export function SummaryTool() {
   };
 
   const handleSubmit = async (text: string) => {
+    if (!isSettingsLoaded) {
+        setError("Settings not loaded yet. Please wait a moment.");
+        return;
+    }
     setIsLoading(true);
     setError(null);
     setMessages((prev) => [...prev, { role: 'user', content: text }]);
@@ -83,6 +87,7 @@ export function SummaryTool() {
       addSession({
         title: text.substring(0, 40) + (text.length > 40 ? '...' : ''),
         type: 'summary',
+        source_text: text,
         content: result.summary,
       });
 
@@ -109,6 +114,24 @@ export function SummaryTool() {
       setIsLoading(false);
     }
   };
+  
+  const handleImport = (item: StudySession) => {
+      // The summary tool doesn't re-process, it just displays.
+      // We will add the imported summary directly to the chat view.
+      if (item.source_text) {
+          setMessages([
+              { role: 'user', content: item.source_text },
+              { role: 'ai', content: typeof item.content === 'string' ? item.content : 'Could not display imported content.' }
+          ]);
+      } else if (typeof item.content === 'string') {
+           setMessages([
+              { role: 'user', content: item.title }, // Fallback to title if no source_text
+              { role: 'ai', content: item.content }
+          ]);
+      } else {
+          setError("Could not import this session. The content is in an unexpected format.")
+      }
+  }
 
   const WelcomeScreen = () => (
     <div className="flex flex-col items-center justify-center h-full text-center p-8 hide-on-print">
@@ -121,6 +144,14 @@ export function SummaryTool() {
       </p>
     </div>
   );
+  
+  const SettingsLoadingScreen = () => (
+    <div className="flex flex-col items-center justify-center h-full p-8 text-center hide-on-print">
+        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+        <h2 className="text-3xl font-semibold">Loading Settings...</h2>
+        <p className="text-muted-foreground text-lg mt-2">Getting your API keys and preferences ready.</p>
+    </div>
+);
   
   return (
     <div className="flex h-screen flex-col bg-background">
@@ -139,7 +170,8 @@ export function SummaryTool() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          {messages.length === 0 && !isLoading && !error && <WelcomeScreen />}
+          {!isSettingsLoaded && <SettingsLoadingScreen />}
+          {isSettingsLoaded && messages.length === 0 && !isLoading && !error && <WelcomeScreen />}
           {messages.map((msg, i) => (
             <div
               key={i}
@@ -208,7 +240,7 @@ export function SummaryTool() {
         </div>
       </div>
       <div className="hide-on-print">
-        <InputArea onSubmit={handleSubmit} isLoading={isLoading} showImport={false}/>
+        <InputArea onSubmit={handleSubmit} onImport={handleImport} isLoading={isLoading || !isSettingsLoaded} showImport={true}/>
       </div>
     </div>
   );

@@ -1,147 +1,116 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
-import { Textarea } from './ui/textarea';
-import { Button } from './ui/button';
-import { Paperclip, Send, FileCode } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import React, { useState } from 'react';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { ArrowUp, Plus, History, FileText, BrainCircuit, Layers } from 'lucide-react';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from './ui/dialog';
-import { useApp, StudySession } from './app-provider';
-import { ScrollArea } from './ui/scroll-area';
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { useApp, type StudySession } from './app-provider';
+
 
 interface InputAreaProps {
   onSubmit: (text: string) => void;
   onImport?: (item: StudySession) => void;
   isLoading: boolean;
-  showImport: boolean;
+  showImport?: boolean;
 }
 
-export function InputArea({
-  onSubmit,
-  onImport,
-  isLoading,
-  showImport,
-}: InputAreaProps) {
+export function InputArea({ onSubmit, onImport, isLoading, showImport = false }: InputAreaProps) {
   const [text, setText] = useState('');
-  const [isImportOpen, setImportOpen] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const { sessions } = useApp();
 
-  const handleTextChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setText(event.target.value);
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
-    }
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setText(e.target.value);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = () => {
     if (text.trim() && !isLoading) {
       onSubmit(text);
-      setText('');
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-      }
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e as any);
+  const handleImportClick = (session: StudySession) => {
+    if (onImport) {
+      onImport(session);
     }
+    setIsPopoverOpen(false); // Close popover after import
   };
-
-  const handleImport = (item: StudySession) => {
-    if (onImport && typeof item.content === 'string') {
-      onImport(item);
+  
+  const getIconForType = (type: StudySession['type']) => {
+    switch (type) {
+      case 'summary': return <FileText className="h-5 w-5 text-blue-500" />;
+      case 'quiz': return <BrainCircuit className="h-5 w-5 text-green-500" />;
+      case 'flashcards': return <Layers className="h-5 w-5 text-purple-500" />;
+      default: return <FileText className="h-5 w-5" />;
     }
-    setImportOpen(false);
-  };
+  }
 
   return (
-    <div className="shrink-0 border-t bg-background p-4">
-      <form
-        onSubmit={handleSubmit}
-        className="relative mx-auto max-w-3xl rounded-lg border bg-card p-2 shadow-sm"
-      >
-        <Textarea
-          ref={textareaRef}
-          value={text}
-          onChange={handleTextChange}
-          onKeyDown={handleKeyDown}
-          placeholder="Paste your text, or describe what you want to generate..."
-          className="max-h-48 resize-none border-0 bg-transparent pr-36 shadow-none focus-visible:ring-0"
-          rows={1}
-          disabled={isLoading}
-        />
-        <div className="absolute bottom-2 right-2 flex items-center gap-1">
-          <Button variant="ghost" size="icon" type="button" disabled={isLoading}>
-            <Paperclip className="h-5 w-5" />
-            <span className="sr-only">Attach file</span>
-          </Button>
-
-          {showImport && onImport && (
-            <Dialog open={isImportOpen} onOpenChange={setImportOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  type="button"
-                  disabled={isLoading}
+    <div className="relative w-full max-w-4xl mx-auto p-4 bg-background">
+        <div className="flex items-end rounded-xl border border-input focus-within:shadow-sm">
+            {showImport && onImport && (
+                <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+                    <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className="m-2 flex-shrink-0" aria-label="Import content">
+                            <Plus className="h-5 w-5" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80 mb-2">
+                        <div className="grid gap-4">
+                            <div className="space-y-2">
+                                <h4 className="font-medium leading-none">Import</h4>
+                                <p className="text-sm text-muted-foreground">Import content from a previous session.</p>
+                            </div>
+                            <div className="space-y-2">
+                                <h5 className="font-medium text-sm flex items-center"><History className="mr-2 h-4 w-4"/> Recents</h5>
+                                <div className="max-h-60 overflow-y-auto space-y-1">
+                                  {sessions.length > 0 ? sessions.map(s => (
+                                    <button 
+                                        key={s.id} 
+                                        className="w-full text-left p-2 hover:bg-accent rounded-md flex items-start gap-3 transition-colors" 
+                                        onClick={() => handleImportClick(s)} 
+                                    > 
+                                        {getIconForType(s.type)}
+                                        <div className="flex-grow">
+                                            <p className="font-medium text-sm leading-tight">{s.title}</p>
+                                            <p className="text-xs text-muted-foreground">{s.type}</p>
+                                        </div>
+                                    </button>
+                                  )) : <p className='text-sm text-muted-foreground text-center p-4'>No recent sessions.</p>}
+                                </div>
+                            </div>
+                        </div>
+                    </PopoverContent>
+                </Popover>
+            )}
+            <Textarea
+            value={text}
+            onChange={handleTextChange}
+            placeholder="Enter your text or notes here..."
+            className="flex-1 bg-transparent border-0 resize-none shadow-none focus-visible:ring-0 text-base py-4 px-2"
+            rows={1}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
+                    e.preventDefault();
+                    handleSubmit();
+                }
+            }}
+            />
+            <Button 
+                onClick={handleSubmit} 
+                disabled={isLoading || !text.trim()} 
+                className="m-2 flex-shrink-0 h-10 w-10"
+                size="icon"
+                aria-label="Submit"
                 >
-                  <FileCode className="h-5 w-5" />
-                  <span className="sr-only">Import from Recents</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Import from Recents</DialogTitle>
-                </DialogHeader>
-                <ScrollArea className="h-96">
-                  <div className="space-y-2 p-1">
-                    {sessions.length > 0 ? (
-                      sessions.map((item) => (
-                        <button
-                          key={item.id}
-                          onClick={() => handleImport(item)}
-                          className="w-full text-left rounded-md border p-4 hover:bg-accent"
-                        >
-                          <p className="font-semibold">{item.title}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {item.type} &bull; {new Date(item.createdAt).toLocaleTimeString()}
-                          </p>
-                        </button>
-                      ))
-                    ) : (
-                      <p className="text-center text-muted-foreground">
-                        No recent items to import.
-                      </p>
-                    )}
-                  </div>
-                </ScrollArea>
-              </DialogContent>
-            </Dialog>
-          )}
-
-          <Button
-            type="submit"
-            size="icon"
-            disabled={isLoading || !text.trim()}
-            className="bg-primary hover:bg-primary/90"
-          >
-            <Send className="h-5 w-5" />
-            <span className="sr-only">Generate</span>
-          </Button>
-        </div>
-      </form>
+                <ArrowUp className="h-5 w-5" />
+            </Button>
+      </div>
     </div>
   );
 }

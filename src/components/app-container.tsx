@@ -1,21 +1,40 @@
 'use client';
 
 import React from 'react';
+import dynamic from 'next/dynamic';
 import {
   SidebarProvider,
   SidebarInset,
   SidebarRail,
 } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/app-sidebar';
-import { SummaryTool } from '@/components/tools/summary-tool';
-import { QuizTool } from '@/components/tools/quiz-tool';
-import { FlashcardsTool } from '@/components/tools/flashcards-tool';
-import { AnswerTool } from '@/components/tools/answer-tool';
 import { useApp } from '@/components/app-provider';
-import { handleGenerateSummary } from '@/app/actions';
-import { handleGenerateQuiz } from '@/app/actions';
-import { handleGenerateFlashcards } from '@/app/actions';
-import { handleGenerateAnswer } from '@/app/actions';
+import { Loader2 } from 'lucide-react';
+
+// Dynamically import the tools with SSR turned off.
+// This means they will only be rendered on the client side.
+const SummaryTool = dynamic(() => import('@/components/tools/summary-tool').then(mod => mod.SummaryTool), { 
+    ssr: false,
+    loading: () => <ToolLoadingSpinner />
+});
+const QuizTool = dynamic(() => import('@/components/tools/quiz-tool').then(mod => mod.QuizTool), { 
+    ssr: false,
+    loading: () => <ToolLoadingSpinner />
+});
+const FlashcardsTool = dynamic(() => import('@/components/tools/flashcards-tool').then(mod => mod.FlashcardsTool), { 
+    ssr: false,
+    loading: () => <ToolLoadingSpinner />
+});
+const AnswerTool = dynamic(() => import('@/components/tools/answer-tool').then(mod => mod.AnswerTool), { 
+    ssr: false,
+    loading: () => <ToolLoadingSpinner />
+});
+
+const ToolLoadingSpinner = () => (
+    <div className="flex h-full w-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+);
 
 export function AppContainer() {
   const { activeTool, setActiveTool } = useApp();
