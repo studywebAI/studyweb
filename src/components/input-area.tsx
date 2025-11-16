@@ -1,116 +1,119 @@
 'use client';
-
-import React, { useState } from 'react';
-import { Textarea } from '@/components/ui/textarea';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowUp, Plus, History, FileText, BrainCircuit, Layers } from 'lucide-react';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Textarea } from '@/components/ui/textarea';
+import { ArrowUp, Paperclip, Loader2, Import } from 'lucide-react';
 import { useApp, type StudySession } from './app-provider';
-
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
 
 interface InputAreaProps {
   onSubmit: (text: string) => void;
-  onImport?: (item: StudySession) => void;
+  onImport?: (item: StudySession) => void; 
   isLoading: boolean;
   showImport?: boolean;
 }
 
 export function InputArea({ onSubmit, onImport, isLoading, showImport = false }: InputAreaProps) {
   const [text, setText] = useState('');
-  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
-  const { sessions } = useApp();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { recentSessions, isSessionsLoading } = useApp();
+  const [popoverOpen, setPopoverOpen] = useState(false);
 
-  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value);
+    adjustTextareaHeight();
   };
 
-  const handleSubmit = () => {
-    if (text.trim() && !isLoading) {
-      onSubmit(text);
+  const adjustTextareaHeight = () => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (text.trim()) {
+      onSubmit(text.trim());
+      setText('');
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e as unknown as React.FormEvent);
     }
   };
 
   const handleImportClick = (session: StudySession) => {
     if (onImport) {
       onImport(session);
-    }
-    setIsPopoverOpen(false); // Close popover after import
-  };
-  
-  const getIconForType = (type: StudySession['type']) => {
-    switch (type) {
-      case 'summary': return <FileText className="h-5 w-5 text-blue-500" />;
-      case 'quiz': return <BrainCircuit className="h-5 w-5 text-green-500" />;
-      case 'flashcards': return <Layers className="h-5 w-5 text-purple-500" />;
-      default: return <FileText className="h-5 w-5" />;
+      setPopoverOpen(false);
     }
   }
 
+  useEffect(() => {
+    adjustTextareaHeight();
+  }, [text]);
+
   return (
-    <div className="relative w-full max-w-4xl mx-auto p-4 bg-background">
-        <div className="flex items-end rounded-xl border border-input focus-within:shadow-sm">
-            {showImport && onImport && (
-                <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-                    <PopoverTrigger asChild>
-                        <Button variant="ghost" size="icon" className="m-2 flex-shrink-0" aria-label="Import content">
-                            <Plus className="h-5 w-5" />
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-80 mb-2">
-                        <div className="grid gap-4">
-                            <div className="space-y-2">
-                                <h4 className="font-medium leading-none">Import</h4>
-                                <p className="text-sm text-muted-foreground">Import content from a previous session.</p>
-                            </div>
-                            <div className="space-y-2">
-                                <h5 className="font-medium text-sm flex items-center"><History className="mr-2 h-4 w-4"/> Recents</h5>
-                                <div className="max-h-60 overflow-y-auto space-y-1">
-                                  {sessions.length > 0 ? sessions.map(s => (
-                                    <button 
-                                        key={s.id} 
-                                        className="w-full text-left p-2 hover:bg-accent rounded-md flex items-start gap-3 transition-colors" 
-                                        onClick={() => handleImportClick(s)} 
-                                    > 
-                                        {getIconForType(s.type)}
-                                        <div className="flex-grow">
-                                            <p className="font-medium text-sm leading-tight">{s.title}</p>
-                                            <p className="text-xs text-muted-foreground">{s.type}</p>
+    <div className="relative p-4 border-t bg-background shadow-top">
+      <form onSubmit={handleSubmit} className="relative flex items-end w-full">
+        {showImport && onImport && (
+             <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="mr-2 flex-shrink-0" disabled={isLoading}>
+                        <Import className="h-5 w-5" />
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="p-0 w-80" align="start">
+                    <Command>
+                        <CommandInput placeholder="Search sessions..." />
+                        <CommandList>
+                            <CommandEmpty>
+                                {isSessionsLoading ? (
+                                    <div className="p-4 text-center text-sm text-muted-foreground">Loading...</div>
+                                ) : (
+                                    <div className="p-4 text-center text-sm text-muted-foreground">No recent sessions found.</div>
+                                )}
+                            </CommandEmpty>
+                            <CommandGroup heading="Recent Sessions">
+                                {recentSessions.map((session) => (
+                                    <CommandItem 
+                                        key={session.id} 
+                                        onSelect={() => handleImportClick(session)}
+                                        className="cursor-pointer"
+                                    >
+                                        <div className="flex flex-col">
+                                            <span className="font-medium">{session.title}</span>
+                                            <span className="text-xs text-muted-foreground">{session.type} - {new Date(session.created_at).toLocaleDateString()}</span>
                                         </div>
-                                    </button>
-                                  )) : <p className='text-sm text-muted-foreground text-center p-4'>No recent sessions.</p>}
-                                </div>
-                            </div>
-                        </div>
-                    </PopoverContent>
-                </Popover>
-            )}
-            <Textarea
-            value={text}
-            onChange={handleTextChange}
-            placeholder="Enter your text or notes here..."
-            className="flex-1 bg-transparent border-0 resize-none shadow-none focus-visible:ring-0 text-base py-4 px-2"
-            rows={1}
-            onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
-                    e.preventDefault();
-                    handleSubmit();
-                }
-            }}
-            />
-            <Button 
-                onClick={handleSubmit} 
-                disabled={isLoading || !text.trim()} 
-                className="m-2 flex-shrink-0 h-10 w-10"
-                size="icon"
-                aria-label="Submit"
-                >
-                <ArrowUp className="h-5 w-5" />
-            </Button>
-      </div>
+                                    </CommandItem>
+                                ))}
+                            </CommandGroup>
+                        </CommandList>
+                    </Command>
+                </PopoverContent>
+            </Popover>
+        )}
+        <Textarea
+          ref={textareaRef}
+          value={text}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
+          placeholder="Or, just start typing your text here to generate a study set..."
+          className="flex-grow resize-none overflow-y-hidden transition-height duration-200 ease-in-out pr-24 pl-4 py-3 leading-tight"
+          rows={1}
+          disabled={isLoading}
+        />
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+          <Button type="submit" size="icon" disabled={isLoading || !text.trim()}>
+            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowUp className="h-4 w-4" />}
+          </Button>
+        </div>
+      </form>
     </div>
   );
 }
