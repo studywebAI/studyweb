@@ -1,0 +1,1 @@
+This directory contains SQL migration files for the Supabase database schema. Apply these files in your Supabase SQL editor to set up and evolve the database structure.

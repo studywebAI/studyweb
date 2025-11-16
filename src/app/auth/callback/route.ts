@@ -1,17 +1,16 @@
-
+// src/app/auth/callback/route.ts
 import { createClient } from '@/lib/supabase/server';
-import { NextResponse, type NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
-  const origin = requestUrl.origin;
 
   if (code) {
-    const supabase = createClient(request);
+    const supabase = createClient();
     await supabase.auth.exchangeCodeForSession(code);
   }
 
   // URL to redirect to after sign in process completes
-  return NextResponse.redirect(origin);
+  return NextResponse.redirect(requestUrl.origin);
 }
