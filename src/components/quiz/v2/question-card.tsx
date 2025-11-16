@@ -46,7 +46,7 @@ export function QuestionCardV2({ question, onAnswer, mode, isAnswered: isExterna
 
   const handleGetExplanation = async () => {
     startTransition(async () => {
-        const result = await getExplanation(question);
+        const result = await getExplanation(question, isCorrect, selectedAnswer);
         if(result.success) setExplanation(result.content);
     });
   }

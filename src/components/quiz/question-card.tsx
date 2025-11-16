@@ -27,7 +27,7 @@ export function QuestionCard({ question, onAnswer, mode }) {
 
   const handleGetExplanation = async () => {
     startTransition(async () => {
-        const result = await getExplanation(question);
+        const result = await getExplanation(question, isCorrect, selectedAnswer);
         if(result.success) setExplanation(result.content);
     });
   }
