@@ -1,189 +1,57 @@
-/**
- * @fileOverview This file provides a unified handler for making calls to different generative AI providers.
- * It abstracts the specific SDKs (OpenAI, Google GenAI) into a single function.
- * It also includes a retry mechanism for API key rotation.
- */
+'use server';
 
-import { GoogleGenerativeAI, GoogleGenerativeAIError } from '@google/generative-ai';
-import OpenAI from 'openai';
 import { z } from 'zod';
+import { type AIModel, getModel, callWithRetry } from './models';
 
-// Define a mapping from model prefixes to providers
-const MODEL_PROVIDER_MAP: Record<string, 'openai' | 'google'> = {
-  'gpt-': 'openai',
-  'gemini-': 'google',
-};
-
-// Helper function to determine the provider from a model name
-function getProviderFromModel(model: string): 'openai' | 'google' {
-  for (const prefix in MODEL_PROVIDER_MAP) {
-    if (model.startsWith(prefix)) {
-      return MODEL_PROVIDER_MAP[prefix];
-    }
-  }
-  // Default to openai if no prefix matches
-  return 'openai';
-}
-
-interface CallGenerativeAIParams<T extends z.ZodType<any, any>> {
-  model: string;
-  apiKey?: { provider: 'openai' | 'google', key: string };
+interface CallGenerativeAIOptions<T extends z.ZodType<any, any, any>> {
+  model: AIModel;
+  apiKey?: {
+    provider: 'google' | 'openai';
+    key: string;
+  } | null;
   systemPrompt: string;
   userPrompt: string;
   schema: T;
 }
 
-// Function to call the underlying AI service. This will be wrapped with retry logic.
-async function callAI<T extends z.ZodType<any, any>>(
-    provider: 'openai' | 'google',
-    apiKey: string,
-    model: string,
-    systemPrompt: string,
-    userPrompt: string,
-    schema: T
+/**
+ * A unified handler to generate content from either Google or OpenAI models.
+ * This function is designed to be called from server-side actions.
+ * It automatically handles API key rotation and retries.
+ * 
+ * @param options - The options for generating content.
+ * @returns The generated content, parsed by the provided Zod schema.
+ */
+export async function callGenerativeAI<T extends z.ZodType<any, any, any>>(
+  options: CallGenerativeAIOptions<T>
 ): Promise<z.infer<T>> {
-    if (provider === 'openai') {
-        return callOpenAI(apiKey, model, systemPrompt, userPrompt, schema);
-    } else if (provider === 'google') {
-        return callGoogleAI(apiKey, model, systemPrompt, userPrompt, schema);
-    }
-    throw new Error(`Unsupported model provider for model: ${model}`);
-}
-
-
-// A wrapper to handle retries with fallback keys.
-async function callWithRetry<T extends z.ZodType<any, any>>(
-    provider: 'openai' | 'google',
-    keys: (string | undefined | null)[] ,
-    model: string,
-    systemPrompt: string,
-    userPrompt: string,
-    schema: T
-): Promise<z.infer<T>> {
-    let lastError: any = new Error(`No valid API keys were available to try for ${provider}.`);
-    
-    for (const key of keys) {
-        if (!key || key.includes('YOUR_') || key.length < 10) {
-            console.warn(`Skipping invalid or placeholder API key.`);
-            continue;
-        };
-        
-        try {
-            return await callAI(provider, key, model, systemPrompt, userPrompt, schema);
-        } catch (error: any) {
-            console.warn(`API call failed with key ending in ...${key.slice(-4)}. Error: ${error.message}`);
-            lastError = error;
-
-            // Check if the error is a quota/authentication error to justify a retry
-            const isRetryableError = (error instanceof OpenAI.APIError && (error.status === 429 || error.status === 401)) ||
-                                   (error instanceof GoogleGenerativeAIError && (error.message.includes('QUOTA') || error.message.includes('API_KEY_INVALID')));
-
-            if (!isRetryableError) {
-                // If it's not a retryable error (e.g. bad request), don't try another key.
-                throw error;
-            }
-        }
-    }
-    // If all keys fail, throw the last encountered error.
-    throw lastError;
-}
-
-
-export async function callGenerativeAI<T extends z.ZodType<any, any>>(
-  params: CallGenerativeAIParams<T>
-): Promise<z.infer<T>> {
-  const { model, apiKey, systemPrompt, userPrompt, schema } = params;
-
-  const provider = getProviderFromModel(model);
+  const { model, apiKey, systemPrompt, userPrompt, schema } = options;
+  const { provider, modelName } = getModel(model);
 
   // Prepare a list of keys to try, starting with the user-provided key (if any).
-  const keysToTry: (string | undefined | null)[] = [apiKey?.key];
+  const keysToTry: string[] = [];
 
-  // Add server-side environment keys as fallbacks, with rotation.
+  // 1. Add user-provided key if it's valid
+  if (apiKey?.key && !apiKey.key.includes('YOUR_') && apiKey.key.length > 10) {
+      keysToTry.push(apiKey.key);
+  }
+  
+  // 2. Add server-side environment keys as fallbacks
   if (provider === 'openai') {
-    keysToTry.push(process.env.OPENAI_API_KEY);
-    keysToTry.push(process.env.OPENAI_API_KEY_2);
-  } else {
-    keysToTry.push(process.env.GEMINI_API_KEY);
-    keysToTry.push(process.env.GEMINI_API_KEY_2);
+    if (process.env.OPENAI_API_KEY) keysToTry.push(process.env.OPENAI_API_KEY);
+    if (process.env.OPENAI_API_KEY_1) keysToTry.push(process.env.OPENAI_API_KEY_1);
+  } else { // 'google'
+    if (process.env.GEMINI_API_KEY) keysToTry.push(process.env.GEMINI_API_KEY);
+    if (process.env.GEMINI_API_KEY_1) keysToTry.push(process.env.GEMINI_API_KEY_1);
   }
 
-  // Filter out any undefined/empty/placeholder keys
-  const availableKeys = keysToTry.filter(k => k && !k.includes('YOUR_') && k.length > 10);
+  // Remove duplicates that might occur if user key is same as env key
+  const uniqueKeys = [...new Set(keysToTry)];
 
-
-  if (availableKeys.length === 0) {
-    throw new Error(`No valid API keys were available to try for ${provider}. Please add one in settings or in the server .env file.`);
+  if (uniqueKeys.length === 0) {
+    throw new Error(`No valid API keys were available for ${provider}. Please add one in settings or in the server .env file.`);
   }
 
-  console.log(`Attempting to call ${provider} with up to ${availableKeys.length} available keys.`);
-  return callWithRetry(provider, availableKeys, model, systemPrompt, userPrompt, schema);
-}
-
-
-async function callOpenAI<T extends z.ZodType<any, any>>(
-  apiKey: string,
-  model: string,
-  systemPrompt: string,
-  userPrompt: string,
-  schema: T
-): Promise<z.infer<T>> {
-    const openai = new OpenAI({ apiKey });
-    const response = await openai.chat.completions.create({
-        model: model,
-        messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.3,
-        response_format: { type: 'json_object' },
-    });
-
-    const content = response.choices[0].message?.content;
-    if (!content) {
-        throw new Error('No content returned from OpenAI API.');
-    }
-
-    const parsedContent = JSON.parse(content);
-    return schema.parse(parsedContent);
-}
-
-
-async function callGoogleAI<T extends z.ZodType<any, any>>(
-  apiKey: string,
-  model: string,
-  systemPrompt: string,
-  userPrompt: string,
-  schema: T
-): Promise<z.infer<T>> {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const geminiModel = genAI.getGenerativeModel({ 
-        model: model,
-        systemInstruction: systemPrompt,
-    });
-    
-    const result = await geminiModel.generateContent(userPrompt);
-    const response = await result.response;
-    const text = response.text();
-
-    // Gemini doesn't have a native JSON mode like OpenAI, so we need to instruct it
-    // and then parse the markdown-formatted JSON from the response.
-    let jsonText = text.replace(/^```json\n/, '').replace(/\n```$/, '');
-
-    // Handle cases where the model might not wrap the JSON in markdown
-    if (!jsonText.startsWith('{') && !jsonText.startsWith('[')) {
-        const jsonStartIndex = jsonText.indexOf('{');
-        const jsonEndIndex = jsonText.lastIndexOf('}');
-        if (jsonStartIndex !== -1 && jsonEndIndex !== -1) {
-            jsonText = jsonText.substring(jsonStartIndex, jsonEndIndex + 1);
-        }
-    }
-
-    try {
-        const parsedContent = JSON.parse(jsonText);
-        return schema.parse(parsedContent);
-    } catch (e) {
-        console.error("Failed to parse JSON from Gemini response:", jsonText);
-        throw new Error("The AI returned a response that was not valid JSON.");
-    }
+  console.log(`Attempting to call ${provider} with up to ${uniqueKeys.length} available keys.`);
+  return await callWithRetry(provider, uniqueKeys, modelName, systemPrompt, userPrompt, schema);
 }
