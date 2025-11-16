@@ -6,8 +6,9 @@ export type QuestionType = 'multiple_choice' | 'open_answer' | 'fill_in_the_blan
 export interface Subject {
     id: string;
     name: string;
-    description?: string;
+    owner_user_id: string;
     created_at: string;
+    description?: string;
 }
 
 export interface Question {
@@ -21,6 +22,7 @@ export interface Question {
     metadata?: Json;
     created_at: string;
     author_id?: string;
+    explanation?: string;
 }
 
 export interface Quiz {

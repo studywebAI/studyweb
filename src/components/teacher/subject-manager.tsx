@@ -6,12 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Trash2, Plus, Loader2, Edit, Save, X } from 'lucide-react';
+import { Trash2, Plus, Loader2, Edit, Save, X, Bot } from 'lucide-react';
 import { QuestionManager } from './question-manager';
 import type { Subject, Question } from '@/types/database';
 import { CsvUploader } from './csv-uploader';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { FileQuestion } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { AiQuestionGenerator } from './ai-question-generator';
 
 type SubjectWithQuestions = Subject & { questions: Question[] };
 
@@ -33,7 +35,14 @@ export function SubjectManager({ initialSubjects }: SubjectManagerProps) {
     startTransition(async () => {
       const result = await createSubject(newSubjectName.trim());
       if (result.success && result.subjectId) {
-        setSubjects(prev => [{ id: result.subjectId!, name: newSubjectName.trim(), questions: [] }, ...prev]);
+        const newSubject: SubjectWithQuestions = {
+            id: result.subjectId!,
+            name: newSubjectName.trim(),
+            questions: [],
+            owner_user_id: '', // This will be set by the server, but we need it for the type
+            created_at: new Date().toISOString()
+        };
+        setSubjects(prev => [newSubject, ...prev]);
         setNewSubjectName('');
         newSubjectInputRef.current?.focus();
       } else {
@@ -78,6 +87,18 @@ export function SubjectManager({ initialSubjects }: SubjectManagerProps) {
       }
     });
   }
+
+  // Callback to refresh questions for a subject after AI generation
+  const onAiQuestionsGenerated = (subjectId: string, newQuestions: Question[]) => {
+      setSubjects(prevSubjects =>
+          prevSubjects.map(subject =>
+              subject.id === subjectId
+                  ? { ...subject, questions: [...newQuestions, ...subject.questions] }
+                  : subject
+          )
+      );
+  };
+
 
   return (
     <div className="space-y-6">
@@ -145,10 +166,19 @@ export function SubjectManager({ initialSubjects }: SubjectManagerProps) {
                                 <AccordionContent>
                                     <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-6">
                                         <QuestionManager subjectId={subject.id} initialQuestions={subject.questions} />
-                                        <div>
-                                            <h4 className="font-semibold mb-2 text-base">Or Bulk Upload</h4>
-                                            <CsvUploader subjectId={subject.id} />
-                                        </div>
+                                        
+                                        <Tabs defaultValue="ai_generator">
+                                            <TabsList className="grid w-full grid-cols-2">
+                                                <TabsTrigger value="ai_generator"><Bot className="w-4 h-4 mr-2" /> AI Generator</TabsTrigger>
+                                                <TabsTrigger value="csv_upload"><FileQuestion className="w-4 h-4 mr-2" /> CSV Upload</TabsTrigger>
+                                            </TabsList>
+                                            <TabsContent value="ai_generator">
+                                                <AiQuestionGenerator subject={subject} onGenerationComplete={(newQuestions) => onAiQuestionsGenerated(subject.id, newQuestions)} />
+                                            </TabsContent>
+                                            <TabsContent value="csv_upload">
+                                                <CsvUploader subjectId={subject.id} />
+                                            </TabsContent>
+                                        </Tabs>
                                     </div>
                                 </AccordionContent>
                             </AccordionItem>

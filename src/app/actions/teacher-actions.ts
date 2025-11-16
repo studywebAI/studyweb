@@ -1,17 +1,18 @@
 'use server';
 
-import { createServerActionClient } from '@supabase/auth-helpers-nextjs';
+import { createServerActionClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import Papa from 'papaparse';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import type { Question } from '@/types/database';
+import { generateQuestions, type GenerateQuestionsInput } from '@/ai/flows/generate-questions';
 
 
 // Define the expected structure of a row in the CSV file.
 const CsvRowSchema = z.object({
     question_text: z.string().min(5),
-    type: z.enum([\'multiple_choice\', \'open_answer\', \'true_false\']),
+    type: z.enum(['multiple_choice', 'open_answer', 'true_false']),
     difficulty: z.preprocess(val => Number(val), z.number().min(0).max(10)),
     // answers and correct_answer will be JSON strings in the CSV
     answers: z.string().optional(), 
@@ -85,7 +86,7 @@ export async function handleCsvUpload(csvContent: string, subject_id: string): P
             return { success: false, message: "No valid questions found in the CSV." };
         }
 
-        const { data, error } = await supabase.from('questions').insert(validatedQuestions as any);
+        const { error } = await supabase.from('questions').insert(validatedQuestions as any);
 
         if (error) {
             return { success: false, message: `Database error: ${error.message}` };
@@ -140,4 +141,60 @@ export async function getQuestionsForSubject(subjectId: string): Promise<GetQues
     }
 
     return { success: true, questions: data as Question[] };
+}
+
+interface GenerateQuestionsResult {
+    success: boolean;
+    message: string;
+    questionCount?: number;
+}
+
+export async function generateQuestionsWithAi(subjectId: string, input: GenerateQuestionsInput): Promise<GenerateQuestionsResult> {
+     try {
+        const { questions } = await generateQuestions(input);
+        
+        if (!questions || questions.length === 0) {
+            return { success: false, message: "The AI failed to generate any questions. Please try again." };
+        }
+
+        const addResult = await addQuestionsToSubject(subjectId, questions);
+        if (!addResult.success) {
+            return addResult;
+        }
+
+        return { success: true, message: `Successfully generated and added ${questions.length} questions.`, questionCount: questions.length };
+    } catch (e: any) {
+        console.error("Error generating questions with AI:", e);
+        return { success: false, message: e.message || "An unexpected error occurred during AI question generation." };
+    }
+}
+
+
+interface AddQuestionsResult {
+    success: boolean;
+    message: string;
+}
+export async function addQuestionsToSubject(subjectId: string, questions: Omit<Question, 'id' | 'created_at' | 'subject_id' | 'author_id'>[]): Promise<AddQuestionsResult> {
+    const supabase = createServerActionClient({ cookies });
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        return { success: false, message: "Authentication required." };
+    }
+    
+    const questionsToInsert = questions.map(q => ({
+        ...q,
+        subject_id: subjectId,
+        author_id: user.id,
+        metadata: { ...q.metadata, source: 'ai_generation' }
+    }));
+
+    const { error } = await supabase.from('questions').insert(questionsToInsert);
+
+    if (error) {
+        return { success: false, message: `Database Error: ${error.message}` };
+    }
+    
+    revalidatePath('/teacher/dashboard');
+    return { success: true, message: 'Questions added.' };
 }
