@@ -18,19 +18,17 @@ import {
 } from '@/components/ui/select';
 import { Input } from './ui/input';
 import { useApp } from './app-provider';
-import type { Tool } from './app-provider';
+import type { StudyTool, GlobalModel } from './app-provider';
 import { Separator } from './ui/separator';
 
-const models = [
+const models: {value: GlobalModel, label: string}[] = [
     { value: 'gpt-4o', label: 'OpenAI: GPT-4o' },
-    { value: 'gpt-4o-mini', label: 'OpenAI: GPT-4o Mini' },
     { value: 'gpt-4-turbo', label: 'OpenAI: GPT-4 Turbo' },
-    { value: 'gpt-4', label: 'OpenAI: GPT-4' },
     { value: 'gemini-1.5-pro-latest', label: 'Google: Gemini 1.5 Pro' },
     { value: 'gemini-1.5-flash-latest', label: 'Google: Gemini 1.5 Flash' },
 ];
 
-const toolLabels: Record<Tool, string> = {
+const toolLabels: Record<StudyTool, string> = {
   summary: 'Summary',
   quiz: 'Quiz',
   flashcards: 'Flashcards',
@@ -71,7 +69,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                         id="openai-key"
                         type="password"
                         placeholder="sk-..."
-                        value={apiKeys.openai}
+                        value={apiKeys.openai || ''}
                         onChange={(e) => setApiKey('openai', e.target.value)}
                     />
                  </div>
@@ -81,7 +79,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                         id="gemini-key"
                         type="password"
                         placeholder="AIzaSy..."
-                        value={apiKeys.google}
+                        value={apiKeys.google || ''}
                         onChange={(e) => setApiKey('google', e.target.value)}
                     />
                  </div>
@@ -97,7 +95,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               <Label htmlFor="global-model">Default Model</Label>
               <Select
                 value={globalModel}
-                onValueChange={(value) => setGlobalModel(value)}
+                onValueChange={(value) => setGlobalModel(value as GlobalModel)}
               >
                 <SelectTrigger id="global-model">
                   <SelectValue placeholder="Select a model" />
@@ -122,7 +120,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               Optionally, select a different model for a specific tool.
             </p>
             <div className="space-y-4">
-              {(Object.keys(toolLabels) as Tool[]).map((tool) => (
+              {(Object.keys(toolLabels) as StudyTool[]).map((tool) => (
                 <div
                   key={tool}
                   className="grid grid-cols-2 items-center gap-4"
@@ -134,7 +132,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                       if (value === 'global') {
                         clearModelOverride(tool);
                       } else {
-                        setModelOverride(tool, value);
+                        setModelOverride(tool, value as GlobalModel);
                       }
                     }}
                   >

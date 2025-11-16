@@ -1,12 +1,11 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { LogOut, Bot, LogIn } from 'lucide-react';
 import { useApp } from './app-provider';
-import { AuthDialog } from './auth-dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,8 +16,7 @@ import {
 } from './ui/dropdown-menu';
 
 export function AppHeader() {
-  const { session, supabase } = useApp();
-  const [isAuthDialogOpen, setAuthDialogOpen] = useState(false);
+  const { session, supabase, setAuthDialogOpen } = useApp();
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -80,7 +78,6 @@ export function AppHeader() {
           </div>
         </div>
       </header>
-      <AuthDialog open={isAuthDialogOpen} onOpenChange={setAuthDialogOpen} />
     </>
   );
 }

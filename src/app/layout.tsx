@@ -1,23 +1,29 @@
+import './globals.css';
 import { Inter, Space_Grotesk } from 'next/font/google';
+import { cn } from '@/lib/utils';
 import { AppProvider } from '@/components/app-provider';
 import { Toaster } from '@/components/ui/toaster';
-import { cn } from '@/lib/utils';
-import './globals.css';
 
 const fontSans = Inter({
   subsets: ['latin'],
   variable: '--font-sans',
 });
 
-const fontSerif = Space_Grotesk({
+const fontHeadline = Space_Grotesk({
   subsets: ['latin'],
-  variable: '--font-serif',
+  variable: '--font-headline',
 });
+
+
+export const metadata = {
+  title: 'StudyGeniusAI',
+  description: 'Generate study materials from your notes.',
+}
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
@@ -25,16 +31,14 @@ export default function RootLayout({
         className={cn(
           'min-h-screen bg-background font-sans antialiased',
           fontSans.variable,
-          fontSerif.variable
+          fontHeadline.variable
         )}
       >
         <AppProvider>
-          <div className="min-h-screen bg-gray-100 dark:bg-gray-900">
             {children}
-          </div>
           <Toaster />
         </AppProvider>
       </body>
     </html>
-  );
+  )
 }
