@@ -1,1 +1,138 @@
-\'use server\';\n\nimport { createServerActionClient } from \'@supabase/auth-helpers-nextjs\';\nimport { cookies } from \'next/headers\';\nimport { revalidatePath } from \'next/cache\';\n\ninterface SubjectActionResult {\n    success: boolean;\n    message: string;\n    subjectId?: string;\n}\n\n/**\n * Creates a new subject for the currently authenticated user.\n * @param name The name of the new subject.\n * @returns The result of the operation.\n */\nexport async function createSubject(name: string): Promise<SubjectActionResult> {\n    const supabase = createServerActionClient({ cookies });\n    const { data: { user } } = await supabase.auth.getUser();\n\n    if (!user) {\n        return { success: false, message: \'Authentication required.\' };\n    }\n\n    if (!name || name.trim().length < 2) {\n        return { success: false, message: \'Subject name must be at least 2 characters long.\' };\n    }\n\n    const { data, error } = await supabase\n        .from(\'subjects\')\n        .insert([{ name: name.trim(), owner_user_id: user.id }])\n        .select(\'id\')\n        .single();\n\n    if (error) {\n        return { success: false, message: `Failed to create subject: ${error.message}` };\n    }\n\n    revalidatePath(\'/teacher/dashboard\'); // Revalidate the dashboard to show the new subject\n    return { success: true, message: `Subject \'${name}\' created.`, subjectId: data.id };\n}\n\n/**\n * Deletes a subject and its associated questions.\n * @param subjectId The ID of the subject to delete.\n * @returns The result of the operation.\n */\nexport async function deleteSubject(subjectId: string): Promise<SubjectActionResult> {\n    const supabase = createServerActionClient({ cookies });\n    const { data: { user } } = await supabase.auth.getUser();\n\n    if (!user) {\n        return { success: false, message: \'Authentication required.\' };\n    }\n\n    // First, verify the user owns the subject\n    const { data: subjectData, error: ownerError } = await supabase\n        .from(\'subjects\')\n        .select(\'owner_user_id\')\n        .eq(\'id\', subjectId)\n        .single();\n\n    if (ownerError || !subjectData) {\n        return { success: false, message: \'Subject not found.\' };\n    }\n\n    if (subjectData.owner_user_id !== user.id) {\n        return { success: false, message: \'You are not authorized to delete this subject.\' };\n    }\n\n    // Due to ON DELETE SET NULL on questions.subject_id, we just delete the subject.\n    // If we wanted to delete questions, we would do that here first.\n    const { error } = await supabase.from(\'subjects\').delete().eq(\'id\', subjectId);\n\n    if (error) {\n        return { success: false, message: `Failed to delete subject: ${error.message}` };\n    }\n\n    revalidatePath(\'/teacher/dashboard\'); // Revalidate the dashboard\n    return { success: true, message: \'Subject deleted successfully.\' };\n}\n
+'use server';
+
+import { createServerActionClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
+import { revalidatePath } from 'next/cache';
+
+interface SubjectActionResult {
+    success: boolean;
+    message: string;
+    subjectId?: string;
+}
+
+/**
+ * Creates a new subject for the currently authenticated user.
+ * @param name The name of the new subject.
+ * @returns The result of the operation.
+ */
+export async function createSubject(name: string): Promise<SubjectActionResult> {
+    const supabase = createServerActionClient({ cookies });
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        return { success: false, message: 'Authentication required.' };
+    }
+
+    if (!name || name.trim().length < 2) {
+        return { success: false, message: 'Subject name must be at least 2 characters long.' };
+    }
+
+    const { data, error } = await supabase
+        .from('subjects')
+        .insert([{ name: name.trim(), owner_user_id: user.id }])
+        .select('id')
+        .single();
+
+    if (error) {
+        return { success: false, message: `Failed to create subject: ${error.message}` };
+    }
+
+    revalidatePath('/teacher/dashboard'); // Revalidate the dashboard to show the new subject
+    return { success: true, message: `Subject '${name}' created.`, subjectId: data.id };
+}
+
+/**
+ * Deletes a subject and its associated questions.
+ * @param subjectId The ID of the subject to delete.
+ * @returns The result of the operation.
+ */
+export async function deleteSubject(subjectId: string): Promise<SubjectActionResult> {
+    const supabase = createServerActionClient({ cookies });
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        return { success: false, message: 'Authentication required.' };
+    }
+
+    // First, verify the user owns the subject
+    const { data: subjectData, error: ownerError } = await supabase
+        .from('subjects')
+        .select('owner_user_id')
+        .eq('id', subjectId)
+        .single();
+
+    if (ownerError || !subjectData) {
+        return { success: false, message: 'Subject not found.' };
+    }
+
+    if (subjectData.owner_user_id !== user.id) {
+        return { success: false, message: 'You are not authorized to delete this subject.' };
+    }
+    
+    // First, delete all questions associated with the subject
+    const { error: questionsError } = await supabase
+        .from('questions')
+        .delete()
+        .eq('subject_id', subjectId);
+    
+    if (questionsError) {
+         return { success: false, message: `Failed to delete questions for subject: ${questionsError.message}` };
+    }
+
+    // Then delete the subject itself
+    const { error } = await supabase.from('subjects').delete().eq('id', subjectId);
+
+    if (error) {
+        return { success: false, message: `Failed to delete subject: ${error.message}` };
+    }
+
+    revalidatePath('/teacher/dashboard'); // Revalidate the dashboard
+    return { success: true, message: 'Subject deleted successfully.' };
+}
+
+
+/**
+ * Updates the name of a subject.
+ * @param subjectId The ID of the subject to update.
+ * @param newName The new name for the subject.
+ * @returns The result of the operation.
+ */
+export async function updateSubject(subjectId: string, newName: string): Promise<SubjectActionResult> {
+    const supabase = createServerActionClient({ cookies });
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        return { success: false, message: 'Authentication required.' };
+    }
+    
+    if (!newName || newName.trim().length < 2) {
+        return { success: false, message: 'Subject name must be at least 2 characters long.' };
+    }
+
+    // Verify user owns the subject
+    const { data: subjectData, error: ownerError } = await supabase
+        .from('subjects')
+        .select('owner_user_id')
+        .eq('id', subjectId)
+        .single();
+
+    if (ownerError || !subjectData) {
+        return { success: false, message: 'Subject not found.' };
+    }
+
+    if (subjectData.owner_user_id !== user.id) {
+        return { success: false, message: 'You are not authorized to edit this subject.' };
+    }
+
+    const { error } = await supabase
+        .from('subjects')
+        .update({ name: newName.trim() })
+        .eq('id', subjectId);
+
+    if (error) {
+        return { success: false, message: `Failed to update subject: ${error.message}` };
+    }
+
+    revalidatePath('/teacher/dashboard');
+    return { success: true, message: 'Subject updated successfully.' };
+}
