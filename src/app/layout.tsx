@@ -35,7 +35,7 @@ export default function RootLayout({
         )}
       >
         <AppProvider>
-            {children}
+          {children}
           <Toaster />
         </AppProvider>
       </body>

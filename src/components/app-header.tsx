@@ -4,8 +4,9 @@
 import React from 'react';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { LogOut, Bot, LogIn } from 'lucide-react';
+import { LogOut, Bot, LogIn, LayoutDashboard } from 'lucide-react';
 import { useApp } from './app-provider';
+import Link from 'next/link';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,10 +28,12 @@ export function AppHeader() {
       <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center">
           <div className="mr-4 flex items-center">
-            <Bot className="h-6 w-6 mr-2 text-primary" />
-            <span className="font-headline text-lg font-semibold tracking-tighter">
-              StudyGeniusAI
-            </span>
+            <Link href="/" className="flex items-center">
+                <Bot className="h-6 w-6 mr-2 text-primary" />
+                <span className="font-headline text-lg font-semibold tracking-tighter">
+                StudyGeniusAI
+                </span>
+            </Link>
           </div>
           <div className="flex flex-1 items-center justify-end space-x-2">
             {session ? (
@@ -62,6 +65,13 @@ export function AppHeader() {
                       </p>
                     </div>
                   </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/teacher/dashboard">
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
+                        <span>Teacher Dashboard</span>
+                    </Link>
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleSignOut}>
                     <LogOut className="mr-2 h-4 w-4" />
