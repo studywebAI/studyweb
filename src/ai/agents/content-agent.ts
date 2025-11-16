@@ -1,6 +1,5 @@
 import { generateQuestions } from '../flows/generate-questions';
 import { BaseAgent } from './base-agent';
-import { models } from '../genkit'; // Note: This import is illustrative. The actual model would be passed in.
 
 /**
  * Agent responsible for generating quiz content.
@@ -14,9 +13,11 @@ export class ContentAgent extends BaseAgent {
      * @returns A promise that resolves to the generated questions.
      */
     async run(topic: string, questionCount: number): Promise<any> {
-        console.log(`[ContentAgent] Generating ${questionCount} questions for topic: "${topic}" using ${this.model.modelName}`);
+        console.log(`[ContentAgent] Generating ${questionCount} questions for topic: "${topic}" using a Genkit flow.`);
         
         try {
+            // This agent now directly uses the generateQuestions flow.
+            // The model used by the flow is defined within the flow itself.
             const result = await generateQuestions({ topic, questionCount });
             return result.questions;
         } catch (error) {

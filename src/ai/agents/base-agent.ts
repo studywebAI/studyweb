@@ -1,4 +1,4 @@
-import { AIModel } from '../genkit';
+import type { AIModel } from './factory';
 
 /**
  * Base class for all AI agents.

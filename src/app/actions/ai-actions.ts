@@ -1,7 +1,6 @@
 'use server';
 
-import { createAgent } from '@/ai/agents/factory';
-import { createGoogleModel } from '@/ai/genkit';
+import { createAgent, createGoogleModel } from '@/ai/agents/factory';
 
 /**
  * Generates a hint for a given question.

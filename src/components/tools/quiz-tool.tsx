@@ -2,8 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ToolOptionsBar, type QuizOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
-import { handleGenerateQuiz } from '@/app/actions';
-import { gradeAnswer as handleGradeAnswer } from '@/app/actions';
+import { handleGenerateQuiz, gradeAnswer as handleGradeAnswer } from '@/app/actions';
 import { Bot, User, FileQuestion, ChevronLeft, ChevronRight, Check, X, AlertCircle, Sparkles, Loader2, ChevronsRight, BookOpen, Repeat, Star, Trophy } from 'lucide-react';
 import { cn, downloadFile } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';

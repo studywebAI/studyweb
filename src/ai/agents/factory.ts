@@ -1,4 +1,7 @@
-import { AIModel, createGoogleModel } from '../genkit';
+
+
+import { genkit } from 'genkit';
+import { googleAI } from '@genkit-ai/google-genai';
 import { BaseAgent } from './base-agent';
 import { ContentAgent } from './content-agent';
 import { DifficultyAgent } from './difficulty-agent';
@@ -6,6 +9,28 @@ import { HintAgent } from './hint-agent';
 import { ExplainerAgent } from './explainer-agent';
 import { TeacherAgent } from './teacher-agent';
 import { EvaluatorAgent } from './evaluator-agent';
+import { ai } from '@/ai/genkit';
+
+
+// This is the new home for the model creation logic, outside of a 'use server' file.
+export interface AIModel {
+    modelName: string;
+    generateContent: (prompt: string) => Promise<any>;
+}
+
+export function createGoogleModel(modelName: string): AIModel {
+    return {
+        modelName,
+        generateContent: async (prompt: string) => {
+            const llmResponse = await ai.generate({
+                model: `google/${modelName}`,
+                prompt: prompt,
+            });
+            return llmResponse.text;
+        }
+    };
+}
+
 
 // Define a map of agent types to their corresponding classes.
 const agentClasses = {
