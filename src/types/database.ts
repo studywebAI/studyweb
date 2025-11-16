@@ -1,3 +1,4 @@
+
 export type Json = | string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type QuestionType = 'multiple_choice' | 'open_answer' | 'fill_in_the_blank' | 'true_false' | 'drag_and_drop' | 'match_pairs' | 'image_labeling' | 'audio_to_text' | 'text_to_audio' | 'code_output' | 'whiteboard';
@@ -43,6 +44,7 @@ export interface QuizAttempt {
     answers?: Json;
     offline_synced: boolean;
     status: 'in_progress' | 'completed';
+    mode: 'classic' | 'practice';
 }
 
 export interface Class {

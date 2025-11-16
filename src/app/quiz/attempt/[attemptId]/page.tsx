@@ -1,3 +1,4 @@
+
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
@@ -45,6 +46,7 @@ export default async function QuizAttemptPage({ params, searchParams }: QuizAtte
         return <div>Error loading questions: {questionsError.message}</div>;
     }
     
+    // The 'in' filter doesn't guarantee order, so we re-order based on the quiz's question_ids array
     const orderedQuestions = questionIds.map(id => questions.find(q => q.id === id)).filter(Boolean);
 
     if (uiVersion === 'v1') {
@@ -55,6 +57,7 @@ export default async function QuizAttemptPage({ params, searchParams }: QuizAtte
         );
     }
 
+    // Default to the new V2 UI
     return (
         <QuizContainerV2 questions={orderedQuestions} attemptId={attemptId} mode={mode} />
     );

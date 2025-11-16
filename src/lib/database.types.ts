@@ -14,16 +14,19 @@ export interface Database {
         Row: {
           id: string
           name: string
+          owner_user_id: string,
           created_at: string
         }
         Insert: {
           id?: string
           name: string
+          owner_user_id: string
           created_at?: string
         }
         Update: {
           id?: string
           name?: string
+          owner_user_id?: string
           created_at?: string
         }
       }
@@ -38,6 +41,7 @@ export interface Database {
           correct_answer: Json
           metadata: Json | null
           created_at: string
+          author_id: string
         }
         Insert: {
           id?: string
@@ -49,6 +53,7 @@ export interface Database {
           correct_answer: Json
           metadata?: Json | null
           created_at?: string
+          author_id: string
         }
         Update: {
           id?: string
@@ -60,6 +65,7 @@ export interface Database {
           correct_answer?: Json
           metadata?: Json | null
           created_at?: string
+          author_id?: string
         }
       }
       quizzes: {
@@ -69,6 +75,7 @@ export interface Database {
           question_ids: string[] | null
           created_at: string
           settings: Json | null
+          title: string,
         }
         Insert: {
           id?: string
@@ -76,6 +83,7 @@ export interface Database {
           question_ids?: string[] | null
           created_at?: string
           settings?: Json | null
+          title: string,
         }
         Update: {
           id?: string
@@ -83,6 +91,7 @@ export interface Database {
           question_ids?: string[] | null
           created_at?: string
           settings?: Json | null
+          title?: string,
         }
       }
       quiz_attempts: {
@@ -97,6 +106,7 @@ export interface Database {
           answers: Json | null
           offline_synced: boolean
           created_at: string
+          mode: string
         }
         Insert: {
           id?: string
@@ -109,6 +119,7 @@ export interface Database {
           answers?: Json | null
           offline_synced?: boolean
           created_at?: string
+          mode: string
         }
         Update: {
           id?: string
@@ -121,84 +132,36 @@ export interface Database {
           answers?: Json | null
           offline_synced?: boolean
           created_at?: string
+          mode?: string
         }
       }
-      classes: {
+      sessions: {
         Row: {
-          id: string
-          teacher_id: string
-          name: string
-          created_at: string
-        }
+            id: string
+            user_id: string
+            created_at: string
+            title: string
+            type: 'summary' | 'flashcards' | 'quiz' | 'answer';
+            source_text: string;
+            content: Json;
+        },
         Insert: {
-          id?: string
-          teacher_id: string
-          name: string
-          created_at?: string
-        }
+            id?: string
+            user_id: string
+            created_at?: string
+            title: string
+            type: 'summary' | 'flashcards' | 'quiz' | 'answer';
+            source_text: string;
+            content: Json;
+        },
         Update: {
-          id?: string
-          teacher_id?: string
-          name?: string
-          created_at?: string
-        }
-      }
-      class_assignments: {
-        Row: {
-          id: string
-          quiz_id: string
-          class_id: string
-          deadline: string | null
-          teacher_id: string
-          settings: Json | null
-          status: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          quiz_id: string
-          class_id: string
-          deadline?: string | null
-          teacher_id: string
-          settings?: Json | null
-          status?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          quiz_id?: string
-          class_id?: string
-          deadline?: string | null
-          teacher_id?: string
-          settings?: Json | null
-          status?: string | null
-          created_at?: string
-        }
-      }
-      teacher_stats: {
-        Row: {
-          id: string
-          quiz_id: string
-          class_id: string
-          average_score: number | null
-          common_mistakes: Json | null
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          quiz_id: string
-          class_id: string
-          average_score?: number | null
-          common_mistakes?: Json | null
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          quiz_id?: string
-          class_id?: string
-          average_score?: number | null
-          common_mistakes?: Json | null
-          updated_at?: string
+            id?: string
+            user_id?: string
+            created_at?: string
+            title?: string
+            type?: 'summary' | 'flashcards' | 'quiz' | 'answer';
+            source_text?: string;
+            content?: Json;
         }
       }
     }
