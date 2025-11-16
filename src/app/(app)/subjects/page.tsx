@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { createQuizAndStartAttempt } from '@/app/actions/quiz-actions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, ShieldAlert } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,6 +50,19 @@ async function SubjectsPage() {
                            // In a real app, you would handle the error case here.
                        }}>
                            <Button type="submit" className="w-full" variant="outline">Start Practice Quiz</Button>
+                       </form>
+                        <form action={async () => {
+                            'use server';
+                            const result = await createQuizAndStartAttempt(subject.id, 'survival');
+                            if (result.success && result.redirectUrl) {
+                                redirect(result.redirectUrl);
+                            }
+                            // In a real app, you would handle the error case here.
+                        }}>
+                           <Button type="submit" className="w-full" variant="destructive">
+                                <ShieldAlert className="w-4 h-4 mr-2" />
+                                Start Survival Quiz
+                            </Button>
                        </form>
                     </CardContent>
                 </Card>

@@ -69,6 +69,7 @@ export async function handleCsvUpload(csvContent: string, subject_id: string): P
                     difficulty: result.data.difficulty,
                     answers: result.data.answers ? JSON.parse(result.data.answers) : null,
                     correct_answer: JSON.parse(result.data.correct_answer),
+                    explanation: result.data.explanation,
                     metadata: { source: 'csv_upload' },
                     author_id: user.id
                 };
@@ -169,10 +170,10 @@ export async function generateQuestionsWithAi(subjectId: string, input: Generate
     }
 }
 
-
 interface AddQuestionsResult {
     success: boolean;
     message: string;
+    newQuestions?: Question[];
 }
 export async function addQuestionsToSubject(subjectId: string, questions: Omit<Question, 'id' | 'created_at' | 'subject_id' | 'author_id'>[]): Promise<AddQuestionsResult> {
     const supabase = createServerActionClient({ cookies });
@@ -189,12 +190,79 @@ export async function addQuestionsToSubject(subjectId: string, questions: Omit<Q
         metadata: { ...q.metadata, source: 'ai_generation' }
     }));
 
-    const { error } = await supabase.from('questions').insert(questionsToInsert);
+    const { data, error } = await supabase.from('questions').insert(questionsToInsert).select();
 
     if (error) {
         return { success: false, message: `Database Error: ${error.message}` };
     }
     
     revalidatePath('/teacher/dashboard');
-    return { success: true, message: 'Questions added.' };
+    return { success: true, message: 'Questions added.', newQuestions: data as Question[] };
+}
+
+
+interface GenerateAndAddSurvivalQuestionsResult {
+    success: boolean;
+    message: string;
+    newQuestionIds?: string[];
+}
+
+export async function generateAndAddSurvivalQuestions(
+    attemptId: string, 
+    subjectId: string,
+    topic: string
+): Promise<GenerateAndAddSurvivalQuestionsResult> {
+    const supabase = createServerActionClient({ cookies });
+    const PENALTY_QUESTION_COUNT = 3;
+
+    try {
+        // 1. Generate new questions using AI
+        const generationResult = await generateQuestions({ topic, questionCount: PENALTY_QUESTION_COUNT });
+        const { questions: newAiQuestions } = generationResult;
+
+        if (!newAiQuestions || newAiQuestions.length === 0) {
+            return { success: false, message: "AI failed to generate penalty questions." };
+        }
+        
+        // 2. Add these new questions to the database
+        const addResult = await addQuestionsToSubject(subjectId, newAiQuestions);
+
+        if (!addResult.success || !addResult.newQuestions) {
+            return { success: false, message: addResult.message || "Failed to save new questions to the database." };
+        }
+        
+        const newQuestionIds = addResult.newQuestions.map(q => q.id);
+
+        // 3. Fetch the current quiz attempt's question_ids from its quiz
+        const { data: attemptData, error: attemptError } = await supabase
+            .from('quiz_attempts')
+            .select('quizzes(question_ids)')
+            .eq('id', attemptId)
+            .single();
+
+        if (attemptError || !attemptData || !attemptData.quizzes) {
+            console.error("Error fetching attempt for survival update:", attemptError);
+            return { success: false, message: 'Could not find the current quiz to update.' };
+        }
+
+        const currentQuestionIds = attemptData.quizzes.question_ids || [];
+        const updatedQuestionIds = [...currentQuestionIds, ...newQuestionIds];
+
+        // 4. Update the original quiz with the new question IDs
+        const { error: quizUpdateError } = await supabase
+            .from('quizzes')
+            .update({ question_ids: updatedQuestionIds })
+            .eq('id', (await supabase.from('quiz_attempts').select('quiz_id').eq('id', attemptId).single()).data?.quiz_id as string);
+
+        if (quizUpdateError) {
+             console.error("Error updating quiz with new survival questions:", quizUpdateError);
+            return { success: false, message: 'Failed to update quiz with penalty questions.' };
+        }
+
+        return { success: true, message: `Added ${PENALTY_QUESTION_COUNT} penalty questions.`, newQuestionIds };
+
+    } catch (e: any) {
+        console.error("Error in survival question generation process:", e);
+        return { success: false, message: e.message || "An unexpected error occurred during survival question generation." };
+    }
 }

@@ -42,6 +42,7 @@ export interface Database {
           metadata: Json | null
           created_at: string
           author_id: string
+          explanation?: string;
         }
         Insert: {
           id?: string
@@ -54,6 +55,7 @@ export interface Database {
           metadata?: Json | null
           created_at?: string
           author_id: string
+          explanation?: string;
         }
         Update: {
           id?: string
@@ -66,6 +68,7 @@ export interface Database {
           metadata?: Json | null
           created_at?: string
           author_id?: string
+          explanation?: string;
         }
       }
       quizzes: {
@@ -106,7 +109,7 @@ export interface Database {
           answers: Json | null
           offline_synced: boolean
           created_at: string
-          mode: string
+          mode: "classic" | "practice" | "survival";
         }
         Insert: {
           id?: string
@@ -119,7 +122,7 @@ export interface Database {
           answers?: Json | null
           offline_synced?: boolean
           created_at?: string
-          mode: string
+          mode: "classic" | "practice" | "survival";
         }
         Update: {
           id?: string
@@ -132,7 +135,7 @@ export interface Database {
           answers?: Json | null
           offline_synced?: boolean
           created_at?: string
-          mode?: string
+          mode?: "classic" | "practice" | "survival";
         }
       }
       sessions: {

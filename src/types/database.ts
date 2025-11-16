@@ -33,6 +33,7 @@ export interface Quiz {
     question_ids?: string[];
     created_at: string;
     settings?: Json;
+    subject_id?: string;
 }
 
 export interface QuizAttempt {
@@ -46,7 +47,7 @@ export interface QuizAttempt {
     answers?: Json;
     offline_synced: boolean;
     status: 'in_progress' | 'completed';
-    mode: 'classic' | 'practice';
+    mode: 'classic' | 'practice' | 'survival';
 }
 
 export interface Class {

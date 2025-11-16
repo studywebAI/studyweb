@@ -1,2 +1,116 @@
-\'use server\';\n\nimport { createServerActionClient } from \'@supabase/auth-helpers-nextjs\';\nimport { cookies } from \'next/headers\';\nimport { redirect } from \'next/navigation\';\n\ninterface ActionResult {\n    success: boolean;\n    message: string;\n    redirectUrl?: string;\n}\n\nexport async function createQuizAndStartAttempt(subjectId: string, mode: string = 'classic', questionCount: number = 10): Promise<ActionResult> {\n    const supabase = createServerActionClient({ cookies });\n    const { data: { user } } = await supabase.auth.getUser();\n\n    if (!user) {\n        return { success: false, message: \'Authentication required.\' };\n    }\n\n    const { data: questions, error: questionsError } = await supabase\n        .from(\'questions\')\n        .select(\'id\')\n        .eq(\'subject_id\', subjectId)\n        .limit(questionCount);\n\n    if (questionsError || !questions || questions.length === 0) {\n        return { success: false, message: \'Could not find any questions for this subject.\' };\n    }\n\n    const questionIds = questions.map(q => q.id);\n\n    const { data: quiz, error: quizError } = await supabase\n        .from(\'quizzes\')\n        .insert({\n            title: `Quiz for subject ${subjectId}`,
-            owner_user_id: user.id,\n            question_ids: questionIds,\n            settings: { mode }\n        })\n        .select(\'id\')\n        .single();\n\n    if (quizError || !quiz) {\n        return { success: false, message: `Failed to create quiz: ${quizError?.message}` };\n    }\n\n    const { data: attempt, error: attemptError } = await supabase\n        .from(\'quiz_attempts\')\n        .insert({\n            user_id: user.id,\n            quiz_id: quiz.id,\n            mode: mode \n        })\n        .select(\'id\')\n        .single();\n\n    if (attemptError || !attempt) {\n        return { success: false, message: `Failed to start quiz attempt: ${attemptError?.message}` };\n    }\n\n    return { success: true, message: 'Quiz started!', redirectUrl: `/quiz/attempt/${attempt.id}` };\n}\n\ninterface SaveAnswerResult {\n    success: boolean;\n    message: string;\n    is_correct: boolean;\n}\n\nexport async function saveAnswer(attemptId: string, questionId: string, answer: any): Promise<SaveAnswerResult> {\n    const supabase = createServerActionClient({ cookies });\n\n    const { data: { user } } = await supabase.auth.getUser();\n    if (!user) {\n        return { success: false, message: \'Authentication required.\', is_correct: false };\n    }\n\n    const { data: questionData, error: questionError } = await supabase\n        .from(\'questions\')\n        .select(\'correct_answer\')\n        .eq(\'id\', questionId)\n        .single();\n\n    if (questionError || !questionData) {\n        return { success: false, message: \'Question not found.\', is_correct: false };\n    }\n\n    const is_correct = JSON.stringify(answer) === JSON.stringify(questionData.correct_answer);\n\n    const { data: attemptData, error: attemptFetchError } = await supabase\n        .from(\'quiz_attempts\')\n        .select(\'answers\')\n        .eq(\'id\', attemptId)\n        .single();\n\n    if (attemptFetchError || !attemptData) {\n        return { success: false, message: \'Quiz attempt not found.\', is_correct: false };\n    }\n\n    const updatedAnswers = (attemptData.answers || []).filter((a: any) => a.question_id !== questionId);\n    updatedAnswers.push({ question_id: questionId, answer, is_correct });\n\n    const { error: updateError } = await supabase\n        .from(\'quiz_attempts\')\n        .update({ answers: updatedAnswers })\n        .eq(\'id\', attemptId);\n\n    if (updateError) {\n        return { success: false, message: updateError.message, is_correct: false };\n    }\n\n    return { success: true, message: \'Answer saved.\', is_correct };\n}\n
+'use server';
+
+import { createServerActionClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import type { QuizAttempt } from '@/types/database';
+
+interface ActionResult {
+    success: boolean;
+    message: string;
+    redirectUrl?: string;
+}
+
+export async function createQuizAndStartAttempt(subjectId: string, mode: QuizAttempt['mode'], questionCount: number = 10): Promise<ActionResult> {
+    const supabase = createServerActionClient({ cookies });
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        return { success: false, message: 'Authentication required.' };
+    }
+
+    const { data: questions, error: questionsError } = await supabase
+        .from('questions')
+        .select('id')
+        .eq('subject_id', subjectId)
+        .limit(questionCount);
+
+    if (questionsError || !questions || questions.length === 0) {
+        return { success: false, message: 'Could not find any questions for this subject.' };
+    }
+
+    const questionIds = questions.map(q => q.id);
+
+    const { data: quiz, error: quizError } = await supabase
+        .from('quizzes')
+        .insert({
+            title: `Quiz for subject ${subjectId}`,
+            owner_user_id: user.id,
+            question_ids: questionIds,
+            settings: { mode },
+            subject_id: subjectId,
+        })
+        .select('id')
+        .single();
+
+    if (quizError || !quiz) {
+        return { success: false, message: `Failed to create quiz: ${quizError?.message}` };
+    }
+
+    const { data: attempt, error: attemptError } = await supabase
+        .from('quiz_attempts')
+        .insert({
+            user_id: user.id,
+            quiz_id: quiz.id,
+            mode: mode 
+        })
+        .select('id')
+        .single();
+
+    if (attemptError || !attempt) {
+        return { success: false, message: `Failed to start quiz attempt: ${attemptError?.message}` };
+    }
+
+    return { success: true, message: 'Quiz started!', redirectUrl: `/quiz/attempt/${attempt.id}` };
+}
+
+interface SaveAnswerResult {
+    success: boolean;
+    message: string;
+    is_correct: boolean;
+}
+
+export async function saveAnswer(attemptId: string, questionId: string, answer: any): Promise<SaveAnswerResult> {
+    const supabase = createServerActionClient({ cookies });
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+        return { success: false, message: 'Authentication required.', is_correct: false };
+    }
+
+    const { data: questionData, error: questionError } = await supabase
+        .from('questions')
+        .select('correct_answer')
+        .eq('id', questionId)
+        .single();
+
+    if (questionError || !questionData) {
+        return { success: false, message: 'Question not found.', is_correct: false };
+    }
+
+    const is_correct = JSON.stringify(answer) === JSON.stringify(questionData.correct_answer);
+
+    const { data: attemptData, error: attemptFetchError } = await supabase
+        .from('quiz_attempts')
+        .select('answers')
+        .eq('id', attemptId)
+        .single();
+
+    if (attemptFetchError || !attemptData) {
+        return { success: false, message: 'Quiz attempt not found.', is_correct: false };
+    }
+
+    const updatedAnswers = (attemptData.answers || []).filter((a: any) => a.question_id !== questionId);
+    updatedAnswers.push({ question_id: questionId, answer, is_correct });
+
+    const { error: updateError } = await supabase
+        .from('quiz_attempts')
+        .update({ answers: updatedAnswers })
+        .eq('id', attemptId);
+
+    if (updateError) {
+        return { success: false, message: updateError.message, is_correct: false };
+    }
+
+    return { success: true, message: 'Answer saved.', is_correct };
+}
