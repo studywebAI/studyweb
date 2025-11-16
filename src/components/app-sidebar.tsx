@@ -26,18 +26,18 @@ import {
   LogIn,
   LogOut,
 } from 'lucide-react';
-import type { Tool } from './app-provider';
 import { useApp } from './app-provider';
 import { cn } from '@/lib/utils';
 import { AuthDialog } from './auth-dialog';
 import { SettingsDialog } from './settings-dialog';
 import { Skeleton } from './ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import type { StudyTool } from './app-provider';
 
 
 interface AppSidebarProps {
-  activeTool: Tool;
-  setActiveTool: (tool: Tool) => void;
+  activeTool: StudyTool;
+  setActiveTool: (tool: StudyTool) => void;
 }
 
 const toolConfig = {
@@ -48,76 +48,19 @@ const toolConfig = {
 };
 
 export function AppSidebar({ activeTool, setActiveTool }: AppSidebarProps) {
-  const { sessions, user, isAuthLoading, supabase } = useApp();
+  const { sessions, session, supabase } = useApp();
   const { state } = useSidebar();
-  const [isAuthDialogOpen, setAuthDialogOpen] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-  }
-  
-  const AuthContent = () => {
-    if (isAuthLoading) {
-        return (
-            <SidebarMenuItem>
-                 <div className="flex items-center gap-2 w-full p-2">
-                    <Skeleton className="h-8 w-8 rounded-full" />
-                    <Skeleton className={cn("h-6 flex-grow", state === 'collapsed' && 'hidden')} />
-                </div>
-            </SidebarMenuItem>
-        )
-    }
-    
-    if (!user) {
-        return (
-            <SidebarMenuItem>
-                <SidebarMenuButton onClick={() => setAuthDialogOpen(true)} tooltip={{ children: 'Login / Sign Up', side: 'right' }}>
-                  <LogIn />
-                  <span>Login</span>
-                </SidebarMenuButton>
-            </SidebarMenuItem>
-        )
-    }
-
-    return (
-        <SidebarMenuItem>
-            <div className={cn("flex items-center w-full p-2 gap-2", state === 'collapsed' && 'justify-center')}>
-                <Avatar className="h-8 w-8">
-                    <AvatarImage src={user.user_metadata.avatar_url} alt={user.email} />
-                    <AvatarFallback>{user.email?.[0].toUpperCase()}</AvatarFallback>
-                </Avatar>
-                <div className={cn("flex-grow overflow-hidden", state === 'collapsed' && 'hidden')}>
-                    <p className="text-sm font-medium truncate">{user.user_metadata.name || user.email}</p>
-                </div>
-                <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={handleSignOut}>
-                    <LogOut className="h-4 w-4"/>
-                </Button>
-            </div>
-        </SidebarMenuItem>
-    );
-  }
 
   return (
     <>
       <Sidebar>
-        <SidebarHeader>
-          <div className={cn("flex items-center gap-2", state === 'collapsed' && 'justify-center')}>
-            <Button variant="ghost" size="icon" className="h-10 w-10">
-              <Bot className="h-6 w-6 text-primary" />
-            </Button>
-            <div className={cn("flex flex-col", state === 'collapsed' && 'hidden')}>
-              <span className="font-headline text-lg font-semibold tracking-tighter">
-                StudyGeniusAI
-              </span>
-            </div>
-          </div>
-        </SidebarHeader>
         <SidebarContent>
           <SidebarGroup>
             <SidebarGroupLabel>Tools</SidebarGroupLabel>
             <SidebarMenu>
-              {(Object.keys(toolConfig) as Tool[]).map((tool) => {
+              {(Object.keys(toolConfig) as StudyTool[]).map((tool) => {
                 const { icon: Icon, label } = toolConfig[tool];
                 return (
                   <SidebarMenuItem key={tool}>
@@ -141,8 +84,8 @@ export function AppSidebar({ activeTool, setActiveTool }: AppSidebarProps) {
               Recents
             </SidebarGroupLabel>
             <SidebarMenu>
-              {isAuthLoading ? (
-                Array.from({length: 3}).map((_, i) => <Skeleton key={i} className="h-14 w-full" />)
+              {!session ? (
+                 <p className="text-xs text-muted-foreground text-center p-4">Login to see your session history.</p>
               ) : sessions.length === 0 ? (
                 <p className="text-xs text-muted-foreground text-center p-4">No recent sessions yet. Create something!</p>
               ) : (
@@ -155,7 +98,7 @@ export function AppSidebar({ activeTool, setActiveTool }: AppSidebarProps) {
                         tooltip={{ children: item.title, side: 'right' }}
                     >
                         <span className="font-medium text-sm">{item.title}</span>
-                        <span className="text-xs text-muted-foreground">{item.type} • {new Date(item.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit'})}</span>
+                        <span className="text-xs text-muted-foreground">{item.type} • {new Date(item.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit'})}</span>
                     </SidebarMenuButton>
                     </SidebarMenuItem>
                 ))
@@ -165,7 +108,6 @@ export function AppSidebar({ activeTool, setActiveTool }: AppSidebarProps) {
         </SidebarContent>
         <SidebarFooter>
           <SidebarMenu>
-             <AuthContent />
             <SidebarMenuItem>
               <SidebarMenuButton onClick={() => setSettingsOpen(true)} tooltip={{ children: 'Settings', side: 'right' }}>
                 <Settings />
@@ -178,7 +120,6 @@ export function AppSidebar({ activeTool, setActiveTool }: AppSidebarProps) {
           </SidebarMenu>
         </SidebarFooter>
       </Sidebar>
-      <AuthDialog open={isAuthDialogOpen} onOpenChange={setAuthDialogOpen} />
       <SettingsDialog open={isSettingsOpen} onOpenChange={setSettingsOpen} />
     </>
   );

@@ -12,10 +12,7 @@ import { QuizTool } from '@/components/tools/quiz-tool';
 import { FlashcardsTool } from '@/components/tools/flashcards-tool';
 import { AnswerTool } from '@/components/tools/answer-tool';
 import { useApp } from '@/components/app-provider';
-import { handleGenerateSummary } from '@/app/actions';
-import { handleGenerateQuiz } from '@/app/actions';
-import { handleGenerateFlashcards } from '@/app/actions';
-import { handleGenerateAnswer } from '@/app/actions';
+import { AppHeader } from './app-header';
 
 export function AppContainer() {
   const { activeTool, setActiveTool } = useApp();
@@ -39,9 +36,8 @@ export function AppContainer() {
     <SidebarProvider>
       <AppSidebar activeTool={activeTool} setActiveTool={setActiveTool} />
       <div className="flex flex-col w-full">
-        <SidebarInset>
-          {getToolComponent()}
-        </SidebarInset>
+        <AppHeader />
+        <SidebarInset>{getToolComponent()}</SidebarInset>
       </div>
       <SidebarRail />
     </SidebarProvider>
