@@ -17,7 +17,7 @@ interface InputAreaProps {
 export function InputArea({ onSubmit, onImport, isLoading, showImport = false }: InputAreaProps) {
   const [text, setText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { recentSessions, isSessionsLoading } = useApp();
+  const { sessions, isSessionsLoading } = useApp();
   const [popoverOpen, setPopoverOpen] = useState(false);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -80,7 +80,7 @@ export function InputArea({ onSubmit, onImport, isLoading, showImport = false }:
                                 )}
                             </CommandEmpty>
                             <CommandGroup heading="Recent Sessions">
-                                {recentSessions.map((session) => (
+                                {sessions && sessions.map((session) => (
                                     <CommandItem 
                                         key={session.id} 
                                         onSelect={() => handleImportClick(session)}
