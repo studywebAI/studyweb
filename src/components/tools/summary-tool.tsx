@@ -67,20 +67,13 @@ export function SummaryTool() {
     
     const model = modelOverrides.summary || globalModel;
     const provider = getProviderFromModel(model);
-    const apiKey = apiKeys[provider];
-
-     if (!apiKey) {
-        setError(`API key for ${provider} is not set. Please add it in Settings.`);
-        setMessages(prev => prev.slice(0, -1)); // Remove the streaming placeholder
-        setIsLoading(false);
-        return;
-    }
+    const userApiKey = apiKeys[provider];
 
     try {
       const result = await handleGenerateSummary({ 
           text,
           model,
-          apiKey: { provider, key: apiKey }
+          apiKey: userApiKey ? { provider, key: userApiKey } : null
       });
       let fullText = result.summary;
 

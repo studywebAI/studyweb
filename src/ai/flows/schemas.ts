@@ -3,13 +3,31 @@ import {z} from 'zod';
 const ApiKeySchema = z.object({
   provider: z.enum(['openai', 'google']),
   key: z.string(),
-})
+}).nullable();
+
 export type ApiKey = z.infer<typeof ApiKeySchema>;
+
+const FlashcardSchema = z.object({
+  front: z.string(),
+  back: z.string(),
+  explanation: z.string().optional(),
+});
+
+export const GenerateHintInputSchema = z.object({
+  card: FlashcardSchema,
+  model: z.string(),
+  apiKey: ApiKeySchema,
+});
+
+export const GenerateHintOutputSchema = z.object({
+  hint: z.string().describe('A single, short sentence hint to help the user recall the back of the flashcard without giving away the answer.'),
+});
+
 
 export const GenerateAnswerFromTextInputSchema = z.object({
   text: z.string().describe('The question to answer.'),
   model: z.string().describe('The AI model to use for generation.'),
-  apiKey: ApiKeySchema.optional(),
+  apiKey: ApiKeySchema,
   history: z
     .array(
       z.object({
@@ -29,7 +47,7 @@ export const GenerateAnswerFromTextOutputSchema = z.object({
 export const GenerateFlashcardsFromTextInputSchema = z.object({
   text: z.string().describe('The text to generate flashcards from.'),
   model: z.string().describe('The AI model to use for generation.'),
-  apiKey: ApiKeySchema.optional(),
+  apiKey: ApiKeySchema,
 });
 
 export const GenerateFlashcardsFromTextOutputSchema = z.object({
@@ -58,7 +76,7 @@ export const GenerateQuizFromSummaryInputSchema = z.object({
     .string()
     .describe('The content of the summary to generate a quiz from.'),
   model: z.string().describe('The AI model to use for generation.'),
-  apiKey: ApiKeySchema.optional(),
+  apiKey: ApiKeySchema,
   options: z
     .object({
       questionCount: z
@@ -89,7 +107,7 @@ export const GenerateQuizFromSummaryOutputSchema = z.object({
 export const GenerateSummaryFromTextInputSchema = z.object({
   text: z.string().describe('The text to summarize.'),
   model: z.string().describe('The AI model to use for generation.'),
-  apiKey: ApiKeySchema.optional(),
+  apiKey: ApiKeySchema,
 });
 
 export const GenerateSummaryFromTextOutputSchema = z.object({
@@ -100,7 +118,7 @@ export const GenerateSummaryFromTextOutputSchema = z.object({
 export const ImportContentForQuizGenerationInputSchema = z.object({
   content: z.string().describe('The content to be used for quiz generation.'),
   model: z.string().describe('The AI model to use for generation.'),
-  apiKey: ApiKeySchema.optional(),
+  apiKey: ApiKeySchema,
   options: z
     .object({
       question_count: z.number().describe('The number of questions to generate.'),
@@ -125,7 +143,7 @@ export const GradeAnswerInputSchema = z.object({
   correctAnswer: z.string().describe("The ideal, correct answer for the question."),
   userAnswer: z.string().describe("The user's submitted answer."),
   model: z.string().describe('The AI model to use for generation.'),
-  apiKey: ApiKeySchema.optional(),
+  apiKey: ApiKeySchema,
 });
 
 export const GradeAnswerOutputSchema = z.object({

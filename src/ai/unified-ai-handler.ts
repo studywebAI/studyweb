@@ -31,7 +31,7 @@ export async function callGenerativeAI<T extends z.ZodType<any, any, any>>(
   // Prepare a list of keys to try, starting with the user-provided key (if any).
   const keysToTry: string[] = [];
 
-  // 1. Add user-provided key if it's valid
+  // 1. Add user-provided key if it's valid and not a placeholder
   if (apiKey?.key && !apiKey.key.includes('YOUR_') && apiKey.key.length > 10) {
       keysToTry.push(apiKey.key);
   }
@@ -49,7 +49,7 @@ export async function callGenerativeAI<T extends z.ZodType<any, any, any>>(
   const uniqueKeys = [...new Set(keysToTry)];
 
   if (uniqueKeys.length === 0) {
-    throw new Error(`No valid API keys were available for ${provider}. Please add one in settings or in the server .env file.`);
+    throw new Error(`No valid API keys were available for ${provider}. Please add one in the app settings or in the server .env file.`);
   }
 
   console.log(`Attempting to call ${provider} with up to ${uniqueKeys.length} available keys.`);

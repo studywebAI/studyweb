@@ -47,14 +47,7 @@ export function AnswerTool() {
 
     const model = modelOverrides.answer || globalModel;
     const provider = getProviderFromModel(model);
-    const apiKey = apiKeys[provider];
-
-    if (!apiKey) {
-        setError(`API key for ${provider} is not set. Please add it in Settings.`);
-        setMessages(prev => prev.slice(0, -1)); // Remove placeholder
-        setIsLoading(false);
-        return;
-    }
+    const userApiKey = apiKeys[provider];
 
     try {
       // The history should only include the user message for this turn, plus any previous turns.
@@ -65,7 +58,7 @@ export function AnswerTool() {
           text, 
           history, 
           model,
-          apiKey: { provider, key: apiKey }
+          apiKey: userApiKey ? { provider, key: userApiKey } : null
       });
       
       const fullText = result.answer;

@@ -25,7 +25,7 @@ import {
     type GenerateHintInput,
 } from '@/ai/flows/generate-hint-for-card';
 
-export async function handleGenerateSummary(input: GenerateSummaryFromTextInput) {
+export async function handleGenerateSummary(input: Omit<GenerateSummaryFromTextInput, 'apiKey'>) {
   try {
     return await generateSummaryFromText(input);
   } catch (e: any) {
@@ -35,7 +35,7 @@ export async function handleGenerateSummary(input: GenerateSummaryFromTextInput)
   }
 }
 
-export async function handleGenerateQuiz(input: GenerateQuizFromSummaryInput) {
+export async function handleGenerateQuiz(input: Omit<GenerateQuizFromSummaryInput, 'apiKey'>) {
     try {
         return await generateQuizFromSummary(input);
     } catch (e: any) {
@@ -44,7 +44,7 @@ export async function handleGenerateQuiz(input: GenerateQuizFromSummaryInput) {
     }
 }
 
-export async function handleGenerateFlashcards(input: GenerateFlashcardsFromTextInput) {
+export async function handleGenerateFlashcards(input: Omit<GenerateFlashcardsFromTextInput, 'apiKey'>) {
     try {
         return await generateFlashcardsFromText(input);
     } catch (e: any) {
@@ -53,7 +53,7 @@ export async function handleGenerateFlashcards(input: GenerateFlashcardsFromText
     }
 }
 
-export async function handleGenerateAnswer(input: GenerateAnswerFromTextInput) {
+export async function handleGenerateAnswer(input: Omit<GenerateAnswerFromTextInput, 'apiKey'>) {
     try {
         return await generateAnswerFromText(input);
     } catch (e: any) {
@@ -62,7 +62,7 @@ export async function handleGenerateAnswer(input: GenerateAnswerFromTextInput) {
     }
 }
 
-export async function handleGradeAnswer(input: GradeAnswerInput) {
+export async function handleGradeAnswer(input: Omit<GradeAnswerInput, 'apiKey'>) {
     try {
         return await gradeAnswer(input);
     } catch (e: any)        {
@@ -71,7 +71,7 @@ export async function handleGradeAnswer(input: GradeAnswerInput) {
     }
 }
 
-export async function handleGenerateHint(input: GenerateHintInput) {
+export async function handleGenerateHint(input: Omit<GenerateHintInput, 'apiKey'>) {
     try {
         return await generateHintForCard(input);
     } catch (e: any) {

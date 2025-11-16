@@ -2,27 +2,9 @@
 
 import { z } from 'zod';
 import { callGenerativeAI } from '../unified-ai-handler';
+import { GenerateHintInputSchema, GenerateHintOutputSchema } from './schemas';
 
-const FlashcardSchema = z.object({
-  front: z.string(),
-  back: z.string(),
-  explanation: z.string().optional(),
-});
-
-export const GenerateHintInput = z.object({
-  card: FlashcardSchema,
-  model: z.string(),
-  apiKey: z.object({
-      provider: z.enum(['openai', 'google']),
-      key: z.string(),
-  }),
-});
-
-export type GenerateHintInput = z.infer<typeof GenerateHintInput>;
-
-const HintOutputSchema = z.object({
-  hint: z.string().describe('A single, short sentence hint to help the user recall the back of the flashcard without giving away the answer.'),
-});
+export type GenerateHintInput = z.infer<typeof GenerateHintInputSchema>;
 
 export async function generateHintForCard(
   input: GenerateHintInput
@@ -38,7 +20,7 @@ export async function generateHintForCard(
     apiKey,
     systemPrompt,
     userPrompt,
-    schema: HintOutputSchema,
+    schema: GenerateHintOutputSchema,
   });
 
   return { hint: result.hint };

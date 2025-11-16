@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ToolOptionsBar, type FlashcardOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
-import { handleGenerateFlashcards, handleGetHint } from '@/app/actions';
+import { handleGenerateFlashcards, handleGenerateHint } from '@/app/actions';
 import { Loader2, AlertCircle, Sparkles, Wand, ArrowRight, ArrowLeft, RefreshCw, Trophy, BookOpen, Repeat, Star, HelpCircle, ChevronsRight, Send } from 'lucide-react';
 import { useApp, type StudySession } from '../app-provider';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
@@ -36,7 +36,7 @@ interface Question {
 
 
 export function FlashcardsTool() {
-  const [options, setOptions] = useState<FlashcardOptions>({ difficulty: 'medium' });
+  const [options, setOptions] = useState<FlashcardOptions>({ cardCount: 20 });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [allCards, setAllCards] = useState<SessionCard[]>([]);
@@ -59,15 +59,14 @@ export function FlashcardsTool() {
     
     const model = modelOverrides.flashcards || globalModel;
     const provider = getProviderFromModel(model);
-    const apiKey = apiKeys[provider];
-    if (!apiKey) {
-        setError(`API key for ${provider} is not set.`);
-        setIsLoading(false);
-        return;
-    }
+    const userApiKey = apiKeys[provider];
 
     try {
-      const result = await handleGenerateFlashcards({ text, model, apiKey: { provider, key: apiKey }});
+      const result = await handleGenerateFlashcards({ 
+        text, 
+        model, 
+        apiKey: userApiKey ? { provider, key: userApiKey } : null
+      });
       startNewSession(result.cards);
       addSession({ title: `Flashcards on: ${text.substring(0, 30)}...`, type: 'flashcards', content: result, source_text: text });
     } catch (e: any) {
@@ -265,8 +264,8 @@ function WelcomeScreen() {
                 <div className="flex justify-around items-center p-4 bg-muted rounded-lg">
                     <p className="font-semibold">Did you get it right?</p>
                     <div className="flex gap-4">
-                        <Button onClick={() => handleMarkCorrect(true)} variant="success" size="lg">Yes <ChevronsRight className="ml-2" /></Button>
-                        <Button onClick={() => handleMarkCorrect(false)} variant="destructive" size="lg">No <ChevronsRight className="ml-2" /></Button>
+                        <Button onClick={() => handleMarkCorrect(true)} variant="secondary" className="bg-green-500 hover:bg-green-600 text-white">Yes <ChevronsRight className="ml-2" /></Button>
+                        <Button onClick={() => handleMarkCorrect(false)} variant="secondary" className="bg-red-500 hover:bg-red-600 text-white">No <ChevronsRight className="ml-2" /></Button>
                     </div>
                 </div>
             )}
@@ -288,17 +287,15 @@ function FollowUpQandA({ card }: { card: SessionCard }) {
         setAnswer('');
         const model = modelOverrides.flashcards || globalModel;
         const provider = getProviderFromModel(model);
-        const apiKey = apiKeys[provider];
-
-        if (!apiKey) {
-            setAnswer("Could not get answer: API key is not set.");
-            setIsHintLoading(false);
-            return;
-        }
+        const userApiKey = apiKeys[provider];
 
         try {
-            const hintText = await handleGetHint({ question: `Regarding the flashcard "${card.front}" / "${card.back}", the user has the following question: "${question}"`, model, apiKey: { provider, key: apiKey } });
-            setAnswer(hintText);
+            const result = await handleGenerateHint({ 
+                card, 
+                model, 
+                apiKey: userApiKey ? { provider, key: userApiKey } : null
+            });
+            setAnswer(result.hint);
         } catch (e: any) {
             setAnswer(`Error getting answer: ${e.message}`);
         } finally {

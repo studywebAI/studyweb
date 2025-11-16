@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ToolOptionsBar, type QuizOptions } from '../tool-options-bar';
 import { InputArea } from '../input-area';
-import { handleGenerateQuiz, handleGetHint } from '@/app/actions';
+import { handleGenerateQuiz } from '@/app/actions';
+import { gradeAnswer as handleGradeAnswer } from '@/app/actions';
 import { Bot, User, FileQuestion, ChevronLeft, ChevronRight, Check, X, AlertCircle, Sparkles, Loader2, ChevronsRight, BookOpen, Repeat, Star, Trophy } from 'lucide-react';
 import { cn, downloadFile } from '@/lib/utils';
 import { Skeleton } from '../ui/skeleton';
@@ -25,16 +26,17 @@ interface Flashcard {
 
 interface Question {
   question: string;
-  options: string[];
   correctAnswer: string;
   explanation: string;
   userAnswer?: string;
   isCorrect?: boolean;
+  grade?: 'correct' | 'incorrect' | 'partially_correct';
+  gradeExplanation?: string;
 }
 
 
 export function QuizTool() {
-  const [options, setOptions] = useState<QuizOptions>({ numQuestions: 5, questionType: 'multiple-choice' });
+  const [options, setOptions] = useState<QuizOptions>({ questionCount: 10, difficulty: 'medium' });
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -44,7 +46,7 @@ export function QuizTool() {
 
   const getProviderFromModel = (model: string) => model.startsWith('gemini') ? 'google' : 'openai';
 
-  const handleSubmit = async (text: string) => {
+  const generateQuiz = async (text: string) => {
     if (!isSettingsLoaded) return;
     setIsLoading(true);
     setError(null);
@@ -53,16 +55,16 @@ export function QuizTool() {
 
     const model = modelOverrides.quiz || globalModel;
     const provider = getProviderFromModel(model);
-    const apiKey = apiKeys[provider];
-    if (!apiKey) {
-      setError(`API key for ${provider} is not set.`);
-      setIsLoading(false);
-      return;
-    }
+    const userApiKey = apiKeys[provider];
 
     try {
-      const result = await handleGenerateQuiz({ text, options, model, apiKey: { provider, key: apiKey } });
-      setQuestions(result.questions.map(q => ({ ...q, options: q.options || [] })));
+      const result = await handleGenerateQuiz({ 
+          summaryContent: text, 
+          options, 
+          model, 
+          apiKey: userApiKey ? { provider, key: userApiKey } : null
+      });
+      setQuestions(result.questions);
       setCurrentQuestionIndex(0);
       addSession({ title: `Quiz on: ${text.substring(0, 30)}...`, type: 'quiz', content: result, source_text: text });
     } catch (e: any) {
@@ -72,12 +74,40 @@ export function QuizTool() {
     }
   };
 
-  const handleAnswer = (answer: string) => {
+  const handleAnswer = async (answer: string) => {
     const newQuestions = [...questions];
     const currentQuestion = newQuestions[currentQuestionIndex];
     currentQuestion.userAnswer = answer;
-    currentQuestion.isCorrect = answer === currentQuestion.correctAnswer;
-    setQuestions(newQuestions);
+    
+    // Set immediate visual feedback while grading
+    setQuestions([...newQuestions]);
+
+    const model = modelOverrides.quiz || globalModel;
+    const provider = getProviderFromModel(model);
+    const userApiKey = apiKeys[provider];
+
+    try {
+        const gradeResult = await handleGradeAnswer({
+            question: currentQuestion.question,
+            correctAnswer: currentQuestion.correctAnswer,
+            userAnswer: answer,
+            model,
+            apiKey: userApiKey ? { provider, key: userApiKey } : null
+        });
+
+        currentQuestion.grade = gradeResult.grade;
+        currentQuestion.gradeExplanation = gradeResult.explanation;
+        currentQuestion.isCorrect = gradeResult.grade === 'correct';
+
+    } catch(e: any) {
+        console.error("Error grading answer:", e);
+        // Fallback to simple comparison if AI grading fails
+        currentQuestion.isCorrect = answer.toLowerCase() === currentQuestion.correctAnswer.toLowerCase();
+        currentQuestion.grade = currentQuestion.isCorrect ? 'correct' : 'incorrect';
+        currentQuestion.gradeExplanation = currentQuestion.isCorrect ? 'Your answer is correct.' : `The correct answer is: ${currentQuestion.correctAnswer}`;
+    } finally {
+        setQuestions([...newQuestions]);
+    }
   };
 
   const handleNext = () => {
@@ -95,20 +125,20 @@ export function QuizTool() {
   };
 
   const handleRestart = () => {
-    setQuestions(questions.map(q => ({ ...q, userAnswer: undefined, isCorrect: undefined })));
+    setQuestions(questions.map(q => ({ ...q, userAnswer: undefined, isCorrect: undefined, grade: undefined, gradeExplanation: undefined })));
     setCurrentQuestionIndex(0);
     setShowResults(false);
   };
   
   const handleImport = (item: StudySession) => {
     let importText = '';
-    if (typeof item.content === 'string') {
-      importText = item.content;
-    } else if (item.source_text) {
+    if (item.source_text) {
       importText = item.source_text;
+    } else if (typeof item.content === 'string') {
+      importText = item.content;
     } else if (item.type === 'quiz' && item.content && 'questions' in item.content) {
       const quizContent = item.content as { questions: Question[] };
-      setQuestions(quizContent.questions.map(q => ({...q, userAnswer: undefined, isCorrect: undefined, options: q.options || []})));
+      setQuestions(quizContent.questions.map(q => ({...q, userAnswer: undefined, isCorrect: undefined, grade: undefined, gradeExplanation: undefined})));
       setCurrentQuestionIndex(0);
       setShowResults(false);
       setError(null);
@@ -122,7 +152,7 @@ export function QuizTool() {
     }
 
     if (importText) {
-        handleSubmit(importText);
+        generateQuiz(importText);
     }
   };
 
@@ -131,7 +161,7 @@ export function QuizTool() {
     if (!isSettingsLoaded) return <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
     if (isLoading && questions.length === 0) return <div className="flex justify-center items-center h-full"><Loader2 className="h-8 w-8 animate-spin" /></div>;
     if (error) return <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>;
-    if (showResults) return <ResultsScreen questions={questions} onRestart={handleRestart} onReview={() => setShowResults(false)} numQuestions={options.numQuestions} />;
+    if (showResults) return <ResultsScreen questions={questions} onRestart={handleRestart} onReview={() => setShowResults(false)} />;
     if (questions.length > 0) return <QuestionDisplay question={questions[currentQuestionIndex]} onAnswer={handleAnswer} onNext={handleNext} onPrevious={handlePrevious} isFirst={currentQuestionIndex === 0} isLast={currentQuestionIndex === questions.length - 1} currentIndex={currentQuestionIndex} totalQuestions={questions.length} />;
     return <WelcomeScreen />;
   };
@@ -140,12 +170,10 @@ export function QuizTool() {
     <div className="flex h-screen flex-col bg-background">
       <ToolOptionsBar activeTool="quiz" quizOptions={options} onQuizOptionsChange={(newOptions) => setOptions(prev => ({ ...prev, ...newOptions }))} />
       <div className="flex-grow overflow-y-auto p-4 md:p-6">{renderContent()}</div>
-      <InputArea onSubmit={handleSubmit} onImport={handleImport} isLoading={isLoading} showImport={true} />
+      <InputArea onSubmit={generateQuiz} onImport={handleImport} isLoading={isLoading} showImport={true} />
     </div>
   );
 }
-
-// ... WelcomeScreen, QuestionDisplay, ResultsScreen remain the same
 
 function WelcomeScreen() {
   return (
@@ -173,42 +201,35 @@ interface QuestionDisplayProps {
 }
 
 function QuestionDisplay({ question, onAnswer, onNext, onPrevious, isFirst, isLast, currentIndex, totalQuestions }: QuestionDisplayProps) {
-    const [showExplanation, setShowExplanation] = useState(false);
-    const [hint, setHint] = useState<string | null>(null);
-    const [isHintLoading, setIsHintLoading] = useState(false);
-    const { globalModel, modelOverrides, apiKeys } = useApp();
+    const [userAnswer, setUserAnswer] = useState('');
     
-    const getProviderFromModel = (model: string) => model.startsWith('gemini') ? 'google' : 'openai';
-
     useEffect(() => {
-        setShowExplanation(false);
-        setHint(null);
+        // Reset local input when question changes
+        setUserAnswer(question.userAnswer || '');
     }, [question]);
 
-    const handleGetHint = async () => {
-        setIsHintLoading(true);
-        setHint(null);
-        const model = modelOverrides.quiz || globalModel;
-        const provider = getProviderFromModel(model);
-        const apiKey = apiKeys[provider];
-        if (!apiKey) {
-            setHint("Could not get hint: API key is not set.");
-            setIsHintLoading(false);
-            return;
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (userAnswer.trim()) {
+            onAnswer(userAnswer);
         }
-        try {
-            const hintText = await handleGetHint({ question: question.question, model, apiKey: { provider, key: apiKey } });
-            setHint(hintText);
-        } catch (e: any) {
-            setHint(`Error getting hint: ${e.message}`);
-        } finally {
-            setIsHintLoading(false);
+    }
+
+    const getGradeColor = (grade?: 'correct' | 'incorrect' | 'partially_correct') => {
+        switch (grade) {
+            case 'correct': return 'bg-green-100 dark:bg-green-900/50 border-green-300 dark:border-green-700';
+            case 'incorrect': return 'bg-red-100 dark:bg-red-900/50 border-red-300 dark:border-red-700';
+            case 'partially_correct': return 'bg-yellow-100 dark:bg-yellow-900/50 border-yellow-300 dark:border-yellow-700';
+            default: return 'bg-muted';
         }
     };
-
-    const handleOptionClick = (option: string) => {
-        onAnswer(option);
-        setShowExplanation(true);
+    const getGradeIcon = (grade?: 'correct' | 'incorrect' | 'partially_correct') => {
+        switch (grade) {
+            case 'correct': return <Check className="h-5 w-5 mr-2 text-green-600" />;
+            case 'incorrect': return <X className="h-5 w-5 mr-2 text-red-600" />;
+            case 'partially_correct': return <AlertCircle className="h-5 w-5 mr-2 text-yellow-600" />;
+            default: return null;
+        }
     };
 
     return (
@@ -220,44 +241,34 @@ function QuestionDisplay({ question, onAnswer, onNext, onPrevious, isFirst, isLa
                     <CardTitle className="text-2xl font-bold leading-tight">{question.question}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {question.options.map((option, index) => (
-                            <Button
-                                key={index}
-                                variant={question.userAnswer === option ? (question.isCorrect ? 'success' : 'destructive') : 'outline'}
-                                className="w-full h-auto text-left justify-start p-4 whitespace-normal text-base"                                
-                                onClick={() => handleOptionClick(option)}
-                                disabled={!!question.userAnswer}
-                            >
-                                <span className="font-bold mr-3">{String.fromCharCode(65 + index)}:</span>
-                                <span>{option}</span>
-                            </Button>
-                        ))}
-                    </div>
-                    {showExplanation && (
-                         <div className={`p-4 rounded-md mt-4 text-base ${question.isCorrect ? 'bg-green-100 dark:bg-green-900/50 border border-green-300 dark:border-green-700' : 'bg-red-100 dark:bg-red-900/50 border border-red-300 dark:border-red-700'}`}>
+                    <form onSubmit={handleSubmit}>
+                        <Textarea
+                            value={userAnswer}
+                            onChange={(e) => setUserAnswer(e.target.value)}
+                            placeholder="Type your answer here..."
+                            className="text-base"
+                            rows={4}
+                            disabled={!!question.grade}
+                        />
+                        <Button type="submit" className="mt-4" disabled={!userAnswer.trim() || !!question.grade}>Submit Answer</Button>
+                    </form>
+                    
+                    {question.grade && (
+                         <div className={cn('p-4 rounded-md mt-4 text-base border', getGradeColor(question.grade))}>
                             <h3 className="font-bold flex items-center mb-2">
-                                {question.isCorrect ? <Check className="h-5 w-5 mr-2 text-green-600" /> : <X className="h-5 w-5 mr-2 text-red-600" />} 
-                                {question.isCorrect ? 'Correct!' : 'Incorrect'}
+                                {getGradeIcon(question.grade)}
+                                {question.grade?.replace('_', ' ')}
                             </h3>
-                            <p className="text-foreground/90">{question.explanation}</p>
-                            {!question.isCorrect && <p className="mt-2 text-foreground/80">The correct answer is: <strong className="font-semibold">{question.correctAnswer}</strong></p>}
-                        </div>
-                    )}
-                    {!question.userAnswer && (
-                         <div className="pt-2">
-                            <Button variant="link" size="sm" onClick={handleGetHint} disabled={isHintLoading}>
-                                {isHintLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />} 
-                                Ask AI for a hint
-                            </Button>
-                            {hint && <p className="text-sm text-muted-foreground mt-2 p-3 bg-muted rounded-md">{hint}</p>}
+                            <div className="prose prose-sm dark:prose-invert max-w-none">
+                                <Markdown>{question.gradeExplanation || question.explanation}</Markdown>
+                            </div>
                         </div>
                     )}
                 </CardContent>
             </Card>
             <div className="flex justify-between items-center mt-6">
                 <Button variant="outline" onClick={handlePrevious} disabled={isFirst}><ChevronLeft className="mr-2 h-4 w-4" /> Previous</Button>
-                <Button onClick={onNext} disabled={!question.userAnswer} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                <Button onClick={onNext} disabled={!question.grade} className="bg-primary hover:bg-primary/90 text-primary-foreground">
                      {isLast ? 'Show Results' : 'Next'} <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
             </div>
@@ -269,12 +280,13 @@ interface ResultsScreenProps {
     questions: Question[];
     onRestart: () => void;
     onReview: () => void;
-    numQuestions: number;
 }
 
-function ResultsScreen({ questions, onRestart, onReview, numQuestions }: ResultsScreenProps) {
-    const correctAnswers = questions.filter(q => q.isCorrect).length;
-    const score = (correctAnswers / questions.length) * 100;
+function ResultsScreen({ questions, onRestart, onReview }: ResultsScreenProps) {
+    const correctAnswers = questions.filter(q => q.grade === 'correct').length;
+    const partiallyCorrectAnswers = questions.filter(q => q.grade === 'partially_correct').length;
+    // Award half points for partially correct
+    const score = ((correctAnswers + partiallyCorrectAnswers * 0.5) / questions.length) * 100;
 
     const getPerformanceMessage = () => {
         if (score === 100) return "Perfect Score! Truly a StudyGenius!";
@@ -290,7 +302,7 @@ function ResultsScreen({ questions, onRestart, onReview, numQuestions }: Results
                 <h1 className="text-4xl font-bold font-headline">Quiz Complete!</h1>
                 <p className="text-xl text-muted-foreground mt-2">{getPerformanceMessage()}</p>
                 <div className="mt-8 text-5xl font-bold">{score.toFixed(0)}<span className="text-3xl text-muted-foreground">%</span></div>
-                <p className="text-lg text-muted-foreground mt-1">You answered {correctAnswers} out of {questions.length} questions correctly.</p>
+                <p className="text-lg text-muted-foreground mt-1">You scored {correctAnswers} correct and {partiallyCorrectAnswers} partially correct out of {questions.length} questions.</p>
             </Card>
             <div className="flex flex-col sm:flex-row justify-center gap-4">
                 <Button size="lg" onClick={onRestart}><Repeat className="mr-2" /> Retake Quiz</Button>
@@ -302,11 +314,12 @@ function ResultsScreen({ questions, onRestart, onReview, numQuestions }: Results
                     <AccordionContent>
                          <div className="space-y-4 p-2 max-h-96 overflow-y-auto">
                             {questions.map((q, index) => (
-                                <div key={index} className={`p-4 border rounded-md ${q.isCorrect ? 'border-green-300 bg-green-50 dark:bg-green-900/20' : 'border-red-300 bg-red-50 dark:bg-red-900/20'}`}>
+                                <div key={index} className={`p-4 border rounded-md ${q.grade === 'correct' ? 'border-green-300 bg-green-50 dark:bg-green-900/20' : q.grade === 'partially_correct' ? 'border-yellow-300 bg-yellow-50 dark:bg-yellow-900/20' : 'border-red-300 bg-red-50 dark:bg-red-900/20'}`}>
                                     <p className="font-semibold text-lg">{index + 1}. {q.question}</p>
-                                    <p className={`mt-2 ${q.isCorrect ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>Your answer: {q.userAnswer} {q.isCorrect ? <Check className="inline h-5 w-5"/> : <X className="inline h-5 w-5"/>}</p>
-                                    {!q.isCorrect && <p className="mt-1 text-muted-foreground">Correct answer: {q.correctAnswer}</p>}
-                                    <p className="mt-2 text-sm text-muted-foreground pt-2 border-t"><em>Explanation: {q.explanation}</em></p>
+                                    <p className={`mt-2 ${q.grade === 'correct' ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}`}>Your answer: {q.userAnswer}</p>
+                                    <div className="mt-2 text-sm text-muted-foreground pt-2 border-t">
+                                        <Markdown>{q.gradeExplanation || q.explanation}</Markdown>
+                                    </div>
                                 </div>
                             ))}
                         </div>
