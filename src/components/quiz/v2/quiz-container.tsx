@@ -8,10 +8,10 @@ import { generateAndAddSurvivalQuestions } from '@/app/actions/teacher-actions';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Volume2, VolumeX, ShieldAlert, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { Question, Quiz } from '@/types/database';
+import type { Question, Quiz, QuizAttempt } from '@/types/database';
 
 
-export function QuizContainerV2({ initialQuestions, attempt, quiz }: { initialQuestions: Question[], attempt: any, quiz: Quiz }) {
+export function QuizContainerV2({ initialQuestions, attempt, quiz }: { initialQuestions: Question[], attempt: QuizAttempt, quiz: Quiz }) {
   const [questions, setQuestions] = useState(initialQuestions);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -34,7 +34,6 @@ export function QuizContainerV2({ initialQuestions, attempt, quiz }: { initialQu
     if (result.is_correct) {
       setScore(score + 1);
     } else if (attempt.mode === 'survival') {
-        // Incorrect answer in survival mode, trigger penalty
         startSurvivalTransition(async () => {
             toast({
                 title: "Incorrect!",
@@ -47,17 +46,24 @@ export function QuizContainerV2({ initialQuestions, attempt, quiz }: { initialQu
                 question.question_text
             );
 
-            if (penaltyResult.success) {
+            if (penaltyResult.success && penaltyResult.newQuestionIds) {
                 toast({
                     title: "Penalty Added!",
                     description: "3 new questions have been added to the end of your quiz. Good luck.",
                     variant: 'destructive'
                 });
-                // The parent component will receive new questions and pass them down,
-                // which will trigger the useEffect to update the state.
-                // We just need to trigger a re-render or re-fetch here.
-                // For now, a page refresh is a simple way, but a better way would be to refetch data.
-                window.location.reload(); 
+                // Fetch the new questions from the server to add to state
+                 const { data: newQuestionsData, error } = await attempt.supabase
+                    .from('questions')
+                    .select('*')
+                    .in('id', penaltyResult.newQuestionIds);
+
+                if (error) {
+                    console.error("Failed to fetch new penalty questions", error);
+                } else if (newQuestionsData) {
+                    // Add new questions to the end of the current session
+                    setQuestions(prev => [...prev, ...newQuestionsData]);
+                }
             } else {
                  toast({
                     title: "Error",

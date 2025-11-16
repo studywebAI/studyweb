@@ -1,21 +1,27 @@
+import { generateQuestions } from '../flows/generate-questions';
 import { BaseAgent } from './base-agent';
+import { models } from '../genkit'; // Note: This import is illustrative. The actual model would be passed in.
 
 /**
  * Agent responsible for generating quiz content.
+ * This agent is a wrapper around the `generateQuestions` flow.
  */
 export class ContentAgent extends BaseAgent {
     /**
-     * Generates quiz questions based on a given context.
-     * @param context - The context to generate questions from.
-     * @returns A list of generated questions.
+     * Generates quiz questions based on a given topic and count.
+     * @param topic - The topic to generate questions about.
+     * @param questionCount - The number of questions to generate.
+     * @returns A promise that resolves to the generated questions.
      */
-    async run(context: string): Promise<any[]> {
-        // In a real implementation, this would use the AI model to generate questions.
-        // For now, it returns a mock response.
-        console.log(`Generating content with ${this.model.modelName} for context: ${context}`);
-        return Promise.resolve([
-            { type: 'multiple_choice', question_text: 'What is the capital of France?', answers: { a: 'Paris', b: 'London', c: 'Berlin', d: 'Madrid' }, correct_answer: 'a' },
-            { type: 'true_false', question_text: 'The earth is flat.', correct_answer: false }
-        ]);
+    async run(topic: string, questionCount: number): Promise<any> {
+        console.log(`[ContentAgent] Generating ${questionCount} questions for topic: "${topic}" using ${this.model.modelName}`);
+        
+        try {
+            const result = await generateQuestions({ topic, questionCount });
+            return result.questions;
+        } catch (error) {
+            console.error('Error generating content with ContentAgent:', error);
+            throw new Error('Failed to generate quiz content.');
+        }
     }
 }
