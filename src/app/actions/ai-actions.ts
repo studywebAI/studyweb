@@ -1,7 +1,7 @@
 'use server';
 
 import { createAgent } from '@/ai/agents/factory';
-import { models } from '@/ai/models';
+import { createGoogleModel } from '@/ai/genkit';
 
 /**
  * Generates a hint for a given question.
@@ -11,7 +11,7 @@ import { models } from '@/ai/models';
 export async function getHint(question: any) {
     try {
         // Using a lightweight model for hints to be fast.
-        const hintAgent = createAgent('hint', models.google['gemini-1.5-flash-latest']);
+        const hintAgent = createAgent('hint', createGoogleModel('gemini-1.5-flash-latest'));
         const hint = await hintAgent.run(question);
         return { success: true, content: hint };
     } catch (error) {
@@ -29,7 +29,7 @@ export async function getHint(question: any) {
  */
 export async function getExplanation(question: any, isCorrect: boolean, userAnswer: any) {
     try {
-        const explainerAgent = createAgent('explainer', models.google['gemini-pro']);
+        const explainerAgent = createAgent('explainer', createGoogleModel('gemini-1.5-pro-latest'));
         const explanation = await explainerAgent.run(question, isCorrect, userAnswer);
         return { success: true, content: explanation };
     } catch (error) {
