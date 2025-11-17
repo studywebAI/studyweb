@@ -1,5 +1,5 @@
 
-import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
+import { createServerComponentClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { QuizContainer } from '@/components/quiz/quiz-container';

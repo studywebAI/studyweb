@@ -1,4 +1,4 @@
-import { nextHandler } from 'genkit/next';
+import { nextHandler } from '@genkit-ai/next/plugin';
 import { ai } from '@/ai/genkit'; // Adjust this import path if needed
 
 
