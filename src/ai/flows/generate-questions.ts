@@ -65,7 +65,7 @@ const generateQuestionsFlow = ai.defineFlow(
   async (input) => {
     
     const llmResponse = await ai.generate({
-      model: 'googleai/gemini-1.5-pro-latest',
+      model: 'google/gemini-1.5-pro-latest',
       prompt: generationPrompt,
       input: {
           topic: input.topic,
@@ -79,6 +79,12 @@ const generateQuestionsFlow = ai.defineFlow(
       }
     });
 
-    return llmResponse.output() ?? { questions: [] };
+    const output = llmResponse.output;
+
+    if (!output) {
+      throw new Error("AI failed to generate questions in the expected format.");
+    }
+
+    return output;
   }
 );

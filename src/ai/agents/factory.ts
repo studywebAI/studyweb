@@ -1,7 +1,5 @@
-
-
 import { genkit } from 'genkit';
-import { googleAI } from '@genkit-ai/google-genai';
+import { googleAI } from '@genkit-ai/googleai';
 import { BaseAgent } from './base-agent';
 import { ContentAgent } from './content-agent';
 import { DifficultyAgent } from './difficulty-agent';
@@ -18,47 +16,25 @@ export interface AIModel {
     generateContent: (prompt: string) => Promise<any>;
 }
 
-export function createGoogleModel(modelName: string): AIModel {
-    return {
-        modelName,
-        generateContent: async (prompt: string) => {
-            const llmResponse = await ai.generate({
-                model: `google/${modelName}`,
-                prompt: prompt,
-            });
-            return llmResponse.text;
+export class AgentFactory {
+    static createAgent(type: string): BaseAgent {
+        const model = ai.getmodel({ name: 'gemini-1.5-flash' });
+
+        switch (type) {
+            case 'content':
+                return new ContentAgent(model);
+            case 'difficulty':
+                return new DifficultyAgent(model);
+            case 'hint':
+                return new HintAgent(model);
+            case 'explainer':
+                return new ExplainerAgent(model);
+            case 'teacher':
+                return new TeacherAgent(model);
+            case 'evaluator':
+                return new EvaluatorAgent(model);
+            default:
+                throw new Error(`Unknown agent type: ${type}`);
         }
-    };
-}
-
-
-// Define a map of agent types to their corresponding classes.
-const agentClasses = {
-    content: ContentAgent,
-    difficulty: DifficultyAgent,
-    hint: HintAgent,
-    explainer: ExplainerAgent,
-    teacher: TeacherAgent,
-    evaluator: EvaluatorAgent
-};
-
-// Define a type for the keys of the agentClasses map.
-export type AgentType = keyof typeof agentClasses;
-
-/**
- * Factory function to create an AI agent instance.
- * @param agentType - The type of agent to create.
- * @param model - The AI model configuration to use for the agent. If not provided, a default is used.
- * @returns An instance of the requested agent.
- */
-export function createAgent(agentType: AgentType, model?: AIModel): BaseAgent {
-    const AgentClass = agentClasses[agentType];
-    if (!AgentClass) {
-        throw new Error(`Unknown agent type: ${agentType}`);
     }
-
-    // If no model is provided, create a default one. This is a fallback.
-    const agentModel = model || createGoogleModel('gemini-1.5-flash-latest');
-    
-    return new AgentClass(agentModel);
 }
